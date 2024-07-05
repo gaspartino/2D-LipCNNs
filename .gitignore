@@ -1,0 +1,5 @@
+# Ignore the data folder
+data/
+
+# Ignore all folders that start with saved_models_seed
+saved_models_seed*/
