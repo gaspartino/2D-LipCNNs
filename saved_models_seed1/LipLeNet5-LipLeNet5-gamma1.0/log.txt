@@ -1,0 +1,8 @@
+[10:31:10] {'mode': 'train', 'model': 'LipLeNet5', 'gamma': 1.0, 'seed': 1, 'epochs': 30, 'layer': 'LipLeNet5', 'lr': 0.01, 'root_dir': './saved_models', 'train_batch_size': 256, 'test_batch_size': 256, 'dataset': 'mnist', 'lip_batch_size': 64, 'print_freq': 10, 'save_freq': 5, 'in_channels': 1, 'img_size': 32, 'num_classes': 10, 'loss': 'xent', 'offset': 1.5, 'train_dir': './saved_models_seed1/LipLeNet5-LipLeNet5-gamma1.0'}
+[10:31:10] Set global seed to 1
+[10:32:01] {'mode': 'train', 'model': 'LipLeNet5', 'gamma': 1.0, 'seed': 1, 'epochs': 30, 'layer': 'LipLeNet5', 'lr': 0.01, 'root_dir': './saved_models', 'train_batch_size': 256, 'test_batch_size': 256, 'dataset': 'mnist', 'lip_batch_size': 64, 'print_freq': 10, 'save_freq': 5, 'in_channels': 1, 'img_size': 32, 'num_classes': 10, 'loss': 'xent', 'offset': 1.5, 'train_dir': './saved_models_seed1/LipLeNet5-LipLeNet5-gamma1.0'}
+[10:32:01] Set global seed to 1
+[10:32:01] name: LipLeNet5-LipLeNet5, num_params: 89.0K
+[10:34:09] {'mode': 'train', 'model': 'LipLeNet5', 'gamma': 1.0, 'seed': 1, 'epochs': 30, 'layer': 'LipLeNet5', 'lr': 0.01, 'root_dir': './saved_models', 'train_batch_size': 256, 'test_batch_size': 256, 'dataset': 'mnist', 'lip_batch_size': 64, 'print_freq': 10, 'save_freq': 5, 'in_channels': 1, 'img_size': 32, 'num_classes': 10, 'loss': 'xent', 'offset': 1.5, 'train_dir': './saved_models_seed1/LipLeNet5-LipLeNet5-gamma1.0'}
+[10:34:09] Set global seed to 1
+[10:34:09] name: LipLeNet5-LipLeNet5, num_params: 89.0K

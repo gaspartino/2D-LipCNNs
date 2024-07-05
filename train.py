@@ -5,7 +5,7 @@ from model import getModel
 from dataset import getDataLoader
 from utils import *
 import csv
-from FGSM_attack import *
+from attack import *
 
 def train(config):
     
@@ -22,15 +22,14 @@ def train(config):
     nparams = np.sum([p.numel() for p in model.parameters() if p.requires_grad])
 
     if nparams >= 1000000:
-        txtlog(f"name: {config.model}-{config.layer}-{config.scale}, num_params: {1e-6*nparams:.1f}M")
+        txtlog(f"name: {config.model}-{config.layer}, num_params: {1e-6*nparams:.1f}M")
     else:
-        txtlog(f"name: {config.model}-{config.layer}-{config.scale}, num_params: {1e-3*nparams:.1f}K")
+        txtlog(f"name: {config.model}-{config.layer}, num_params: {1e-3*nparams:.1f}K")
     
     Epochs = config.epochs
     Lr = config.lr
     steps_per_epoch = len(trainLoader)
     PrintFreq = config.print_freq
-    LLN = config.LLN
     gamma = config.gamma
 
     opt = torch.optim.Adam(model.parameters(), lr=Lr, weight_decay=0)
@@ -80,11 +79,7 @@ def train(config):
         model(torch.rand((1,x.shape[1], x.shape[2], x.shape[3])).to(x.device)) 
 
         n, Loss, Acc = 0, 0.0, 0.0
-        Acc36, Acc72, Acc108 = 0.0, 0.0, 0.0
         model.eval()
-        if LLN:
-            last_weight = model.model[-1].weight
-            normalized_weight = torch.nn.functional.normalize(last_weight, p=2, dim=1)
 
         start = time.time()
         with torch.no_grad():
@@ -96,34 +91,10 @@ def train(config):
                 correct = yh.max(1)[1] == y
                 acc = correct.sum().item()
                 Acc += acc
-                
-
-                if config.cert_acc:
-                    margins, indices = torch.sort(yh, 1)
-                    if LLN:
-                        margins = margins[:, -1][:, None] - margins[: , 0:-1]
-                        for idx in range(margins.shape[0]):
-                            margins[idx] /= torch.norm(
-                                normalized_weight[indices[idx, -1]] - normalized_weight[indices[idx, 0:-1]], dim=1, p=2)
-                        margins, _ = torch.sort(margins, 1)
-                        cert36 = margins[:, 0] > 36.0/255 * gamma
-                        cert72 = margins[:, 0] > 72.0/255 * gamma
-                        cert108= margins[:, 0] > 108.0/255 * gamma
-                    else:
-                        cert36 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 36/255.0
-                        cert72 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 72/255.0
-                        cert108= (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma *108/255.0
-
-                    Acc36 += torch.sum(correct & cert36).item()
-                    Acc72 += torch.sum(correct & cert72).item()
-                    Acc108+= torch.sum(correct & cert108).item()
 
         test_time = time.time()-start 
         test_loss = Loss/n
         test_acc = 100*Acc/n
-        Acc36 = 100.0*Acc36/n 
-        Acc72 = 100.0*Acc72/n
-        Acc108= 100.0*Acc108/n
 
         ttime_epoch.append(train_time)
         vtime_epoch.append(test_time)
@@ -132,16 +103,8 @@ def train(config):
         tacc_epoch.append(train_acc)
         vacc_epoch.append(test_acc)
 
-        if config.cert_acc:
-            acc36_epoch.append(Acc36)
-            acc72_epoch.append(Acc72)
-            acc108_epoch.append(Acc108)
 
-            txtlog(f"Epoch: {epoch+1:3d} | time: {train_time:.1f}/{test_time:.1f}, loss: {train_loss:.2f}/{test_loss:.2f}, acc: {train_acc:.1f}/{test_acc:.1f}, cert: {Acc36:.1f}/{Acc72:.1f}/{Acc108:.1f}, 100lr: {100*lr:.3f}")
-            
-        else:
-
-            txtlog(f"Epoch: {epoch+1:3d} | time: {train_time:.1f}/{test_time:.1f}, loss: {train_loss:.2f}/{test_loss:.2f}, acc: {train_acc:.1f}/{test_acc:.1f}, 100lr: {100*lr:.3f}")
+        txtlog(f"Epoch: {epoch+1:3d} | time: {train_time:.1f}/{test_time:.1f}, loss: {train_loss:.2f}/{test_loss:.2f}, acc: {train_acc:.1f}/{test_acc:.1f}, 100lr: {100*lr:.3f}")
 
         if epoch % config.save_freq == 0 or epoch + 1 == Epochs:
             torch.save(model.state_dict(), f"{config.train_dir}/model.ckpt")
@@ -170,7 +133,7 @@ def train(config):
     else:
         txtlog(f"Lipschitz capcity: {gam:.4f}/{gamma:.2f}, {100*gam/gamma:.2f}")
 
-    adv_accuracies = FGSM_attack(config)
+    adv_accuracies = PGDL2_attack(config)
 
     filename = "saved_models.csv"
     data = [config.model, config.layer, config.seed, config.epochs, gamma, gam, adv_accuracies[0].item(), adv_accuracies[1].item(), adv_accuracies[2].item(), adv_accuracies[3].item()]
