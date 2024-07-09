@@ -58,7 +58,6 @@ class All2C2F(nn.Module):
         self.img_size = config.img_size
         self.num_classes = config.num_classes
         self.gamma = config.gamma 
-        self.LLN = config.LLN
         self.layer = config.layer
 
         if self.gamma is not None:
@@ -170,7 +169,6 @@ class AllLeNet5(nn.Module):
         self.img_size = config.img_size
         self.num_classes = config.num_classes
         self.gamma = config.gamma 
-        self.LLN = config.LLN
         self.layer = config.layer
 
         if self.gamma is not None:

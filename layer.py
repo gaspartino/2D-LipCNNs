@@ -72,22 +72,6 @@ def findP1P2(H1, H2, A12, B1, Qm, cin, cout, r, s):
 
     return P1, P2
 
-def findF_2D_2(P1, P2, A12, B1, Qm, cin, cout, r, s):
-    A11, A22, B2, _ = construct_A11A22B2C1(cin, cout, r, s)
-
-    if s > 1:
-        Qm = torch.kron(torch.eye(s**2),Qm)
-
-    F11 = P1-A11.T@P1@A11
-    F12 = -A12.T@P1@A11
-    F22 = P2-A22.T@P2@A22
-    F13 = -B1.T@P1@A11
-    F23 = -B1.T@P1@A12-B2.T@P2@A22
-    F33 = Qm-B1.T@P1@B1-B2.T@P2@B2
-
-    Fmat = torch.cat((torch.cat((F11,F12.T,F13.T),dim=1),torch.cat((F12,F22,F23.T),dim=1),torch.cat((F13,F23,F33),dim=1)),dim=0)
-    return 0.5* (Fmat+Fmat.T) #+ 1e-6 * torch.eye(Fmat.shape[0])
-
 def findF_2D(P1, P2, A12, B1, Qm, cin, cout, r, s):
     P = block_diagonal(P1,P2)
     n_x1 = P1.shape[0]
@@ -106,7 +90,7 @@ def findF_2D(P1, P2, A12, B1, Qm, cin, cout, r, s):
     F_lower_left = - B.T @ P @ A
     F_lower_right = Qm - B.T @ P @ B
     Fmat = torch.cat((torch.cat((F_upper_left, F_upper_right), dim = 1), torch.cat((F_lower_left, F_lower_right),dim = 1)), dim = 0)
-    return 0.5 * (Fmat + Fmat.T) #+ 1e-6 * torch.eye(Fmat.shape[0])
+    return 0.5 * (Fmat + Fmat.T)
 
 def flatten_stride(mat, cout):
     len_ = mat.shape[0] // cout
@@ -144,22 +128,6 @@ def construct_A11A22B2C1(cin, cout, kernel, s):
         A22 = torch.from_numpy(A22)
         B2 = torch.from_numpy(B2)
 
-    # A11_lower_left = torch.eye(n_x1 - n_u)
-    # A11_lower_right = torch.zeros((n_x1 - n_u, n_u))
-    # A11 = torch.cat((torch.zeros(n_u, n_x1),torch.cat((A11_lower_left, A11_lower_right), dim = 1)), dim = 0)
-
-    # A22_upper_left = torch.zeros((n_x2 - n_u, n_u))
-    # A22_upper_right = torch.eye(n_x2 - n_u)
-    # A22 = torch.cat((torch.cat((A22_upper_left, A22_upper_right), dim = 1), torch.zeros((n_u, n_x2))), dim = 0)
-    
-    # B2_upper = torch.zeros((n_x2 - n_u, n_u))
-    # B2_lower = torch.eye(n_u)
-    # B2 = torch.cat((B2_upper, B2_lower), dim = 0)
-        
-    # C1_left = torch.zeros((n_x1 - n_y, n_y))
-    # C1_right = torch.eye(n_y)    
-    # C1 = torch.cat((C1_left, C1_right), dim = 1)
-
     return A11, A22, B2, C1
 
 def ABCDt2K(A12,B1,C2,D,l,s):
@@ -170,14 +138,13 @@ def ABCDt2K(A12,B1,C2,D,l,s):
     l1 = l
     l2 = l
         
-    # Combine A12, B1, C2, and D into the final matrix
+    # Combine A12, B1, C2, and D into a matrix
     mat = torch.cat((torch.cat((A12, B1), dim = 1), torch.cat((C2, D), dim = 1)), dim = 0)
 
     # Reshape mat into a 4D array and permute its dimensions
     K = torch.reshape(mat, (l1, cout, l2, cin))
 
     # Reverse the order of kernel dimensions
-    #K = K[::-1, :, ::-1, :]
     K = torch.flip(K, dims=[0, 2])
 
     # Reshape K back to its original shape
@@ -195,7 +162,7 @@ def ABCD2K(A12,B1,C2,D,l,s):
 
     if s > 1:
     # In case stride >= 2, we need to reshape A12, B1, C2, D
-    # Initialize empty arrays
+    # Initialize arrays
         A12flat = torch.empty((cout, 0))
         B1flat = torch.empty((cout, 0))
         C2flat = C2
@@ -340,59 +307,10 @@ class StridedConv(nn.Module):
         if striding:
             self.register_forward_pre_hook(lambda _, x: \
                     einops.rearrange(x[0], downsample, k1=2, k2=2))  
-            
-class PaddingChannels(nn.Module):
-    def __init__(self, ncin, ncout, scale=1.0):
-        super().__init__()
-        self.ncout = ncout
-        self.ncin = ncin
-        self.scale = scale 
 
-    def forward(self, x):
-        bs, _, size1, size2 = x.shape
-        out = torch.zeros(bs, self.ncout, size1, size2, device=x.device)
-        out[:, :self.ncin] = self.scale * x
-        return out
+#------------------------------------------------------------
+## Sandwich
 
-class PaddingFeatures(nn.Module):
-    def __init__(self, fin, n_features, scale=1.0):
-        super().__init__()
-        self.n_features = n_features
-        self.fin = fin
-        self.scale = scale
-
-    def forward(self, x):
-        out = torch.zeros(x.shape[0], self.n_features, device=x.device)
-        out[:, :self.fin] = self.scale * x 
-        return out
-
-class PlainConv(nn.Conv2d):
-    def forward(self, x):
-        return super().forward(F.pad(x, (1,1,1,1)))
-        
-class LinearNormalized(nn.Linear):
-
-  def __init__(self, in_features, out_features, bias=True, scale=1.0):
-    super(LinearNormalized, self).__init__(in_features, out_features, bias)
-    self.scale = scale
-
-  def forward(self, x):
-    self.Q = F.normalize(self.weight, p=2, dim=1)
-    return F.linear(self.scale * x, self.Q, self.bias)
-      
-class FirstChannel(nn.Module):
-    def __init__(self, cout, scale=1.0):
-        super().__init__() 
-        self.cout = cout
-        self.scale = scale
-
-    def forward(self,x):
-        xdim = len(x.shape)
-        if xdim == 4:
-            return self.scale * x[:,:self.cout,:,:]
-        elif xdim == 2:
-            return self.scale * x[:,:self.cout]
-        
 class SandwichLin(nn.Linear):
     def __init__(self, in_features, out_features, bias=True, scale=1.0, AB=False):
         super().__init__(in_features+out_features, out_features, bias)
@@ -585,26 +503,16 @@ class SandwichConv(StridedConv, nn.Conv2d):
 
         return x
 
+#------------------------------------------------------------
 ## LipCNN
 
 class LipCNNConv(nn.Module):
     def __init__(self, in_channels, out_channels, kernel, stride = 1, padding = 1, bias = True):
         super().__init__()
-        #n_x1 = out_channels*(kernel-1)
-        #n_x2 = in_channels*(kernel-1)
-        #n_u = in_channels
         self.n_x1 = out_channels*int(np.ceil((kernel-stride)/stride))
         self.n_x2 = in_channels*(kernel-stride)*stride
         self.n_u = in_channels*stride**2
         self.n_y = out_channels
-
-        ## This inititialization is used for 4C3F
-        #self.weight = nn.Parameter(torch.randn((out_channels + self.n_x2 + self.n_u, out_channels), dtype=torch.float64), requires_grad=True)
-        #self.A12 = nn.Parameter(0.001*torch.randn((out_channels * (kernel - stride), in_channels * (kernel - stride)), dtype=torch.float64), requires_grad=True)
-        #self.B1 = nn.Parameter(0.001*torch.randn((out_channels * (kernel - stride), in_channels * stride), dtype=torch.float64), requires_grad=True)
-        #self.H1 = nn.Parameter(torch.randn((self.n_x1, self.n_x1), dtype=torch.float64), requires_grad=True)
-        #self.H2 = nn.Parameter(torch.randn((self.n_x2, self.n_x2), dtype=torch.float64), requires_grad=True)
-        #self.psi = nn.Parameter(100*torch.randn((out_channels), dtype=torch.float64), requires_grad=True)
 
         init2C2F=False
 
@@ -633,17 +541,6 @@ class LipCNNConv(nn.Module):
             self.H2 = nn.Parameter(torch.randn((self.n_x2, self.n_x2), dtype=torch.float64), requires_grad=True)
             self.psi = nn.Parameter(10*torch.ones((out_channels), dtype=torch.float64), requires_grad=True)
 
-
-        # self.alpha = nn.Parameter(torch.ones(1, dtype=torch.float32, requires_grad=True))
-        # self.alpha.data = self.weight.norm()
-        # self.alphaA12 = nn.Parameter(torch.ones(1, dtype=torch.float32, requires_grad=True))
-        # self.alphaA12.data = self.A12.norm()
-        # self.alphaB1 = nn.Parameter(torch.ones(1, dtype=torch.float32, requires_grad=True))
-        # self.alphaB1.data = self.B1.norm()
-        # self.alphaH1 = nn.Parameter(torch.ones(1, dtype=torch.float32, requires_grad=True))
-        # self.alphaH1.data = self.H1.norm()
-        # self.alphaH2 = nn.Parameter(torch.ones(1, dtype=torch.float32, requires_grad=True))
-        # self.alphaH2.data = self.H2.norm()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel = kernel
@@ -662,15 +559,11 @@ class LipCNNConv(nn.Module):
         n_y = self.n_y
         if s>1:
             A12, B1 = reshape_A12B1(self.A12, self.B1, cout, cin, r, s)
-            #A12, B1 = reshape_A12B1(self.alphaA12 * self.A12 / self.A12.norm(), self.alphaB1 * self.B1 / self.B1.norm(), cout, cin, r, s)
         else:
             A12 = self.A12
             B1 = self.B1
-            #A12 = self.alphaA12 *  self.A12 / self.A12.norm()
-            #B1 = self.alphaB1 * self.B1 / self.B1.norm()
 
         if self.training or self.Q is None:
-            #self.Q = cayley(self.alpha * self.weight / self.weight.norm())
             self.Q = cayley(self.weight)
         Q = self.Q if self.training else self.Q.detach()
         U = Q[:cout, :]
@@ -678,18 +571,10 @@ class LipCNNConv(nn.Module):
         Qm = L.T @ L
 
         P1, P2 = findP1P2(self.H1, self.H2, A12, B1, Qm, cin, cout, r, s)
-        #P1, P2 = findP1P2(self.alphaH1 * self.H1 / self.H1.norm() , self.alphaH2 * self.H2 / self.H2.norm(), A12, B1, Qm, cin, cout, r, s)
         Fmat = findF_2D(P1, P2, A12, B1, Qm, cin, cout, r, s)
-        #Fmat = findF_2D(P1+1e-12*torch.eye(n_x1), P2+1e-12*torch.eye(n_x2), A12, B1, Qm, cin, cout, r, s)
-        #Fmat2 = findF_2D_2(P1, P2, A12, B1, Qm, cin, cout, r, s)
-        #eigenvalues = torch.linalg.eigvalsh(Fmat)
-        #eigenvalues2 = torch.linalg.eigvalsh(Fmat2)
 
-        #print(torch.min(eigenvalues))
-        #print(torch.min(eigenvalues2))
-
-        F1 = Fmat[:n_x1, :n_x1] #+ epsilon * torch.eye(n_x1)
-        F2 = Fmat[n_x1:, n_x1:] #+ epsilon * torch.eye(n_x2+n_u)
+        F1 = Fmat[:n_x1, :n_x1]
+        F2 = Fmat[n_x1:, n_x1:]
         F12 = Fmat[:n_x1, n_x1:] 
         F1inv = torch.linalg.inv(F1 + 0 * torch.eye(n_x1))
 
@@ -697,45 +582,22 @@ class LipCNNConv(nn.Module):
 
         mat = 0.5 * C1 @ (F1inv+F1inv.T) @ C1.T
 
-        # Compute the eigenvalues
-        #eigenvalues = torch.linalg.eigvalsh(mat)
-
-        # Get the minimum eigenvalue
-        #min_eigenvalue = torch.min(eigenvalues)
-
-        # Set epsilon to 0.01 times the minimum eigenvalue
-        #epsilon = 2* torch.abs(min_eigenvalue)
-        #epsilon = 0.01
-
         gamma = epsilon + self.psi ** 2
-        #gamma = epsilon + torch.exp(self.psi)
         gamma += 0.5 * torch.sum(torch.abs(mat), dim=1) # Diagonal dominance
         #gamma += 0.5 * torch.max(torch.linalg.eigvalsh(mat)) # Maximum eigenvalue
 
         try:
             LGamma = torch.linalg.cholesky(2*torch.diag(gamma) - mat)
         except RuntimeError:
-            # LGamma = torch.linalg.cholesky(2*torch.diag(gamma) - mat + 1e-6 * torch.eye(n_y))
             F1inv = torch.linalg.inv(F1 + 1e-12 * torch.eye(n_x1))
 
             mat = 0.5 * C1 @ (F1inv+F1inv.T) @ C1.T
             gamma = epsilon + self.psi ** 2
             gamma += 0.5 * torch.sum(torch.abs(mat), dim=1) # Diagonal dominance
             #gamma += 0.5 * torch.max(torch.linalg.eigvalsh(mat)) # Maximum eigenvalue
-            
-            #try:
+
             LGamma = torch.linalg.cholesky(2*torch.diag(gamma) - mat)
-            #except RuntimeError:
-            #    try:
-            #        LGamma = torch.linalg.cholesky(2*torch.diag(gamma) - mat + 1e-6 * torch.eye(n_y))
-            #    except RuntimeError:
-            #        LGamma = torch.linalg.cholesky(2*torch.diag(gamma) - mat + 1e-3 * torch.eye(n_y))
 
-            #print('cheat')
-        #print(self.psi)
-
-        #print(torch.min(torch.linalg.eigvalsh(2*torch.diag(gamma) - mat)))
-        
         try:
             arg = F2 - F12.T @ F1inv @ F12
             LF = torch.linalg.cholesky(arg) # + epsilon * torch.eye(n_x2+n_u))
@@ -769,24 +631,6 @@ class LipCNNConv(nn.Module):
 
         L = U @ LGamma.T / gamma
 
-        #Lam = torch.linalg.inv(torch.diag(gamma))
-
-        #mat_upper = torch.cat((arg,-C2hat.T@Lam+F12.T@F1inv@C1.T@Lam), dim = 1)
-        #mat_lower = torch.cat(((-C2hat.T@Lam+F12.T@F1inv@C1.T@Lam).T,2*Lam-L.T@L-Lam@C1@F1inv@C1.T@Lam), dim = 1 )
-
-        #mat_tot = torch.cat((mat_upper,mat_lower),dim = 0)
-
-        #print(torch.min(torch.linalg.eigvalsh(mat_tot)))
-
-        #Chat = torch.cat((C1,C2hat),dim=1)
-
-        #mat_upper = torch.cat((Fmat,-Chat.T@Lam), dim = 1)
-        #mat_lower = torch.cat(((-Chat.T@Lam).T,2*Lam-L.T@L), dim = 1 )
-
-        #mat_tot = torch.cat((mat_upper,mat_lower),dim = 0)
-
-        #print(torch.min(torch.linalg.eigvalsh(mat_tot)))
-
         return K, L
     
     def forward(self, x, L):
@@ -808,15 +652,6 @@ class LipCNNConvMax(nn.Module):
         self.n_x2 = in_channels*(kernel-stride)*stride
         self.n_u = in_channels*stride**2
         self.n_y = out_channels
-
-        ## This inititialization is used for 4C3F
-        #self.weight = nn.Parameter(torch.randn((out_channels + self.n_x2 + self.n_u, out_channels), dtype=torch.float64), requires_grad=True)
-        #self.A12 = nn.Parameter(0.001*torch.randn((out_channels * (kernel - stride), in_channels * (kernel - stride)), dtype=torch.float64), requires_grad=True)
-        #self.B1 = nn.Parameter(0.001*torch.randn((out_channels * (kernel - stride), in_channels * stride), dtype=torch.float64), requires_grad=True)
-        #self.H1 = nn.Parameter(torch.randn((self.n_x1, self.n_x1), dtype=torch.float64), requires_grad=True)
-        #self.H2 = nn.Parameter(torch.randn((self.n_x2, self.n_x2), dtype=torch.float64), requires_grad=True)
-        #self.psi = nn.Parameter(100*torch.randn((out_channels), dtype=torch.float64), requires_grad=True)
-
 
         ## This inititialization is used for LeNet5
         #self.weight = nn.Parameter(torch.randn((out_channels + self.n_x2 + self.n_u, out_channels), dtype=torch.float64), requires_grad=True)
@@ -873,8 +708,8 @@ class LipCNNConvMax(nn.Module):
         P1, P2 = findP1P2(self.H1, self.H2, A12, B1, Qm, cin, cout, r, s)
         Fmat = findF_2D(P1, P2, A12, B1, Qm, cin, cout, r, s)
 
-        F1 = Fmat[:n_x1, :n_x1] #+ epsilon * torch.eye(n_x1)
-        F2 = Fmat[n_x1:, n_x1:] #+ epsilon * torch.eye(n_x2+n_u)
+        F1 = Fmat[:n_x1, :n_x1]
+        F2 = Fmat[n_x1:, n_x1:]
         F12 = Fmat[:n_x1, n_x1:] 
         F1inv = torch.linalg.inv(F1 + 0 * torch.eye(n_x1))
 
@@ -946,10 +781,8 @@ class LipCNNConvMax(nn.Module):
         p = self.padding
         r = self.kernel
 
-
         x = F.conv2d(x, K.float(), padding = p, stride = s)
-        #L = 2 ** 0.5 * U * torch.exp(self.psi) # sqrt(2) U^top Psi
-        #x += self.bias[:, None, None]
+        x += self.bias[:, None, None]
         return x, L
 
 
@@ -957,8 +790,6 @@ class LipCNNFc(nn.Linear):
     def __init__(self, in_features, out_features, bias=True, psi=True):
         super().__init__(in_features+out_features, out_features, bias)
         self.psi = nn.Parameter(torch.ones(out_features, dtype=torch.float64), requires_grad=True) if psi else None
-        #self.alpha = nn.Parameter(torch.ones(1, dtype=torch.float64, requires_grad=True))
-        #self.alpha.data = self.weight.norm()
         self.Q = None
         self.cin = in_features
         self.cout = out_features
@@ -969,7 +800,6 @@ class LipCNNFc(nn.Linear):
         cout = self.cout
 
         if self.training or self.Q is None:
-            #self.Q = cayley(self.alpha * self.weight.T / self.weight.norm())
             self.Q = cayley(self.weight.T)
 
         Q = self.Q if self.training else self.Q.detach()
@@ -980,25 +810,9 @@ class LipCNNFc(nn.Linear):
             W = (2 ** 0.5) * L.T @ V / self.psi #* torch.exp(-self.psi) 
             L = (2 ** 0.5) * U * self.psi #* torch.exp(self.psi)
 
-            #Lam = torch.diag(self.psi **2)
-            #mat_upper = torch.cat((L0.T@L0,-W@Lam), dim = 1)
-            #mat_lower = torch.cat(((-W@Lam).T,2*Lam-L.T@L), dim = 1 )
-
-            #mat_tot = torch.cat((mat_upper,mat_lower),dim = 0)
-
-            #print(torch.min(torch.linalg.eigvalsh(mat_tot)))
-
         else:
-            #L0 = L
             W = L.T @ V
             L = 0
-
-            #mat_upper = torch.cat((L0.T@L0,-W), dim = 1)
-            #mat_lower = torch.cat((-W.T,torch.eye(cout)), dim = 1 )
-
-            #mat_tot = torch.cat((mat_upper,mat_lower),dim = 0)
-
-            #print(torch.min(torch.linalg.eigvalsh(mat_tot)))
 
         return W.T, L
 
@@ -1008,7 +822,8 @@ class LipCNNFc(nn.Linear):
         if self.bias is not None:
             x += self.bias
         return x, L
-    
+ 
+ #------------------------------------------------------------   
 ## Orthogonal layer, from https://github.com/locuslab/orthogonal-convolutions 
  
 class OrthogonLin(nn.Linear):
@@ -1128,7 +943,8 @@ class OrthogonConv(StridedConv, nn.Conv2d):
             y += self.bias[:, None, None]
         y = self.activation(y)
         return y
-    
+
+#------------------------------------------------------------
 # SDP Lipschitz Layer, from https://github.com/araujoalexandre/lipschitz-sll-networks
 class SLLBlockConv(nn.Module):
     def __init__(self, cin, cout, kernel_size=3, scale=1.0, epsilon=1e-6):
@@ -1186,6 +1002,7 @@ class SLLBlockFc(nn.Module):
         out = x - res
         return out
 
+#------------------------------------------------------------
 # almost orthogonal layer (AOL), based on SLL implementation
 
 class AolLin(nn.Module):

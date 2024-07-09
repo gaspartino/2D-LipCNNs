@@ -51,7 +51,7 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--gamma', type=float, default=1.0,
                         help="Network Lipschitz bound") # 1.0
     parser.add_argument('-s', '--seed', type=int, default=1) # 123
-    parser.add_argument('-e','--epochs', type=int, default=30) # 100
+    parser.add_argument('-e','--epochs', type=int, default=5) # 100
     parser.add_argument('--layer', type=str, default='Orthogon')
     parser.add_argument('--lr', type=float, default=0.01,
                         help="learning rate")
@@ -67,7 +67,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     seeds = [1, 123, 296] #[39, 927, 834, 568]
-    models = ['LipLeNet5', 'VanillaLeNet5','AllLeNet5']
+    #models = ['LipLeNet5', 'VanillaLeNet5','AllLeNet5']
+    models = ['VanillaLeNet5']
+
     #models = ['All2C2F', 'Vanilla2C2F', 'Lip2C2F']
     layers = ['Aol', 'Orthogon', 'Sandwich']
     #gammas = [1.0, 2.0, 4.0]

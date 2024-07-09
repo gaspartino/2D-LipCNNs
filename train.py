@@ -120,11 +120,6 @@ def train(config):
     np.savetxt(f'{config.train_dir}/tacc_epoch.csv',np.array(tacc_epoch))
     np.savetxt(f'{config.train_dir}/vacc_epoch.csv',np.array(vacc_epoch))
 
-    if config.cert_acc:
-        np.savetxt(f'{config.train_dir}/acc36_epoch.csv',np.array(acc36_epoch))
-        np.savetxt(f'{config.train_dir}/acc72_epoch.csv',np.array(acc72_epoch))
-        np.savetxt(f'{config.train_dir}/vacc_epoch.csv',np.array(vacc_epoch))
-
     xshape = (config.lip_batch_size, config.in_channels, config.img_size, config.img_size)
     x = (torch.rand(xshape) + 0.3*torch.randn(xshape))
     gam = empirical_lipschitz(model, x)
