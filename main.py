@@ -22,14 +22,23 @@ def main(args):
 
     if config.model == 'Lip2C2F':
         config.layer = 'LipC2F'
+    elif config.model == 'Lip2C2FPool':
+        config.layer = 'LipC2FPool'
     elif config.model == 'Vanilla2C2F':
         config.layer = 'Vanilla2C2F'
+        config.gamma = None
+    elif config.model == 'Vanilla2C2FPool':
+        config.layer = 'Vanilla2C2FPool'
+        config.gamma = None
+    elif config.model == 'AOL2C2F':
+        config.layer = 'AOL2C2F'
     elif config.model == 'LipLeNet5':
         config.layer = 'LipLeNet5'
     elif config.model == 'LipLeNet5Max':
         config.layer = 'LipLeNet5Max'
     elif config.model == 'VanillaLeNet5':
         config.layer = 'VanillaLeNet5'
+        config.gamma = None
 
     if config.gamma is None:
         config.train_dir = f"{config.root_dir}_seed{config.seed}/{config.model}-{config.layer}"
@@ -46,13 +55,13 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--mode', type=str, default='train')
-    parser.add_argument('-m', '--model', type=str, default='All2C2F',
+    parser.add_argument('-m', '--model', type=str, default='Lip2C2F',
                         help="[Lip2C2F, All2C2F, Vanilla2C2F, LipLeNet5, LipLeNet5Max, AllLeNet5, Vanilla2C2F]")
     parser.add_argument('-g', '--gamma', type=float, default=1.0,
                         help="Network Lipschitz bound") # 1.0
     parser.add_argument('-s', '--seed', type=int, default=1) # 123
-    parser.add_argument('-e','--epochs', type=int, default=5) # 100
-    parser.add_argument('--layer', type=str, default='Orthogon')
+    parser.add_argument('-e','--epochs', type=int, default=20) # 100
+    parser.add_argument('--layer', type=str, default='Aol')
     parser.add_argument('--lr', type=float, default=0.01,
                         help="learning rate")
     parser.add_argument('--root_dir', type=str, default='./saved_models')
@@ -66,60 +75,68 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
 
-    seeds = [1, 123, 296] #[39, 927, 834, 568]
+    #seeds = [1, 123, 296] #[39, 927, 834, 568]
+    seeds = [1,296,123]
     #models = ['LipLeNet5', 'VanillaLeNet5','AllLeNet5']
-    models = ['VanillaLeNet5']
+    #models = ['LipLeNet5']
 
-    #models = ['All2C2F', 'Vanilla2C2F', 'Lip2C2F']
-    layers = ['Aol', 'Orthogon', 'Sandwich']
-    #gammas = [1.0, 2.0, 4.0]
-    gammas = [1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0]
-
-    # for seed in seeds:
-    #    args.seed = seed
-    #    for model in models:
-    #        args.model = model
-    #        print(f"Running with seed: {seed}, model: {model}")
-       
-    #        # Check if the current model allows gamma settings
-    #        if model in ['All2C2F', 'Lip2C2F']:
-    #            for gamma in gammas:
-    #                args.gamma =gamma
-    #                print(f"Running with gamma: {gamma}")
-    #                if model == 'All2C2F':
-    #                    for layer in layers:
-    #                        args.layer = layer
-    #                        print(f"Running with layer: {layer}")
-    #                        main(args)
-    #                else:
-    #                    args.layer = 'Lip2C2F'
-    #                    main(args)
-    #                # Call your function or perform actions here with seed, model, and gamma
-    #        else:
-    #            # Call your function or perform actions here with seed and model (no gamma)
-    #            args.layer = 'Vanilla2C2F'
-    #            main(args)
+    #models = ['All2C2F', 'Lip2C2F']
+    #models = ['Lip2C2FPool']
+    models = ['Lip2C2FPool', 'AOL2C2F'] #'Lip2C2F', 'Vanilla2C2F', 'All2C2F', 'Lip2C2F']
+    layers = ['Orthogon', 'Sandwich']
+    #gammas = [1.0, 2.0]
+    #gammas = [10.0, 20.0, 50.0, 100.0]
+    #gammas = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+    gammas = [8.0, 16.0, 32.0]
 
     for seed in seeds:
         args.seed = seed
         for model in models:
             args.model = model
             print(f"Running with seed: {seed}, model: {model}")
-        
+       
             # Check if the current model allows gamma settings
-            if model in ['VanillaLeNet5']:
-                args.layer = 'VanillaLeNet5'
-                main(args)
-            else:
+            if model in ['All2C2F', 'Lip2C2F','AOL2C2F','Lip2C2FPool']:
                 for gamma in gammas:
                     args.gamma =gamma
                     print(f"Running with gamma: {gamma}")
-                    if model == 'AllLeNet5':
-                        args.layer = 'Aol'
-                        main(args)
+                    if model == 'All2C2F':
+                        for layer in layers:
+                            args.layer = layer
+                            print(f"Running with layer: {layer}")
+                            main(args)
                     else:
-                        args.layer = 'LipLeNet5'
+                        #args.layer = 'Lip2C2F'
                         main(args)
+                    # Call your function or perform actions here with seed, model, and gamma
+            else:
+                # Call your function or perform actions here with seed and model (no gamma)
+                #args.layer = 'Vanilla2C2F'
+                main(args)
 
+    # for seed in seeds:
+    #     args.seed = seed
+    #     for model in models:
+    #         args.model = model
+    #         print(f"Running with seed: {seed}, model: {model}")
+        
+    #         # Check if the current model allows gamma settings
+    #         if model in ['VanillaLeNet5']:
+    #             args.layer = 'VanillaLeNet5'
+    #             main(args)
+    #         else:
+    #             for gamma in gammas:
+    #                 args.gamma =gamma
+    #                 print(f"Running with gamma: {gamma}")
+    #                 if model == 'AllLeNet5':
+    #                     args.layer = 'Aol'
+    #                     main(args)
+    #                 else:
+    #                     args.layer = 'LipLeNet5'
+    #                     main(args)
 
-    #main(args)
+    #for seed in seeds:
+    #    args.seed = seed
+    #    for gamma in gammas:
+    #        args.gamma =gamma
+    #        main(args)

@@ -45,7 +45,6 @@ def train(config):
         model.train()
         for batch_idx, batch in enumerate(trainLoader):
             x, y = batch[0], batch[1]
-            L = gamma**0.5 * (torch.eye(3))
             lr = lr_schedule(epoch + (batch_idx+1)/steps_per_epoch)
             opt.param_groups[0].update(lr=lr)
 
