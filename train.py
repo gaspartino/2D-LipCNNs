@@ -6,6 +6,7 @@ from dataset import getDataLoader
 from utils import *
 import csv
 from attack import *
+from compute_lip_2 import *
 
 def train(config):
     
@@ -38,6 +39,11 @@ def train(config):
     tloss_step, tacc_step, lr_step = [], [], []
     ttime_epoch,vtime_epoch,tloss_epoch,vloss_epoch,tacc_epoch, vacc_epoch = [],[],[],[],[],[]
     vacc_epoch,acc36_epoch,acc72_epoch,acc108_epoch = [], [], [], []
+
+    ind = 0
+    if gamma == None:
+        ind = 1
+
     for epoch in range(Epochs):
         ## train_step
         start = time.time()
@@ -78,7 +84,11 @@ def train(config):
         model(torch.rand((1,x.shape[1], x.shape[2], x.shape[3])).to(x.device)) 
 
         n, Loss, Acc = 0, 0.0, 0.0
+        Acc36, Acc72, Acc108 = 0.0, 0.0, 0.0
         model.eval()
+
+        if ind == 1:
+            gamma = lipschitz_upper_bound(model)
 
         start = time.time()
         with torch.no_grad():
@@ -90,6 +100,16 @@ def train(config):
                 correct = yh.max(1)[1] == y
                 acc = correct.sum().item()
                 Acc += acc
+
+                if config.cert_acc and epoch == Epochs-1:
+                    margins, indices = torch.sort(yh, 1)
+                    cert36 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 36/255.0
+                    cert72 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 72/255.0
+                    cert108= (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma *108/255.0
+
+                    Acc36 += torch.sum(correct & cert36).item()
+                    Acc72 += torch.sum(correct & cert72).item()
+                    Acc108+= torch.sum(correct & cert108).item()
 
         test_time = time.time()-start 
         test_loss = Loss/n
@@ -108,6 +128,13 @@ def train(config):
         if epoch % config.save_freq == 0 or epoch + 1 == Epochs:
             torch.save(model.state_dict(), f"{config.train_dir}/model.ckpt")
 
+    Acc36 = 100.0*Acc36/n 
+    Acc72 = 100.0*Acc72/n
+    Acc108= 100.0*Acc108/n
+    print(f"Epsilon: 36 \tAccuracy: {Acc36:.4f}")
+    print(f"Epsilon: 72 \tAccuracy: {Acc72:.4f}")
+    print(f"Epsilon: 108 \tAccuracy: {Acc108:.4f}")
+
     # after training
     np.savetxt(f'{config.train_dir}/tloss_step.csv',np.array(tloss_step))
     np.savetxt(f'{config.train_dir}/tacc_step.csv',np.array(tacc_step))
@@ -122,15 +149,16 @@ def train(config):
     xshape = (config.lip_batch_size, config.in_channels, config.img_size, config.img_size)
     x = (torch.rand(xshape) + 0.3*torch.randn(xshape))
     gam = empirical_lipschitz(model, x)
-    if model.gamma is None:
+    if gamma is None:
         txtlog(f"Lipschitz: {gam:.2f}/--")
     else:
         txtlog(f"Lipschitz capcity: {gam:.4f}/{gamma:.2f}, {100*gam/gamma:.2f}")
 
-    adv_accuracies = PGDL2_attack(config)
+    #adv_accuracies = PGDL2_attack(config)
 
     filename = "saved_models.csv"
-    data = [config.model, config.layer, config.seed, config.epochs, gamma, gam, adv_accuracies[0].item(), adv_accuracies[1].item(), adv_accuracies[2].item(), adv_accuracies[3].item()]
+    #data = [config.model, config.layer, config.seed, config.epochs, gamma, gam, adv_accuracies[0].item(), adv_accuracies[1].item(), adv_accuracies[2].item(), adv_accuracies[3].item(), Acc36, Acc72, Acc108]
+    data = [config.model, config.layer, config.seed, config.epochs, gamma, gam, test_acc, Acc36, Acc72, Acc108]
 
     # Open the file in append mode
     with open(filename, mode='a', newline='') as file:

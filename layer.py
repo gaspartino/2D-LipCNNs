@@ -540,7 +540,7 @@ class LipCNNConv(nn.Module):
             self.B1 = nn.Parameter(0.001*torch.randn((out_channels * (kernel - stride), in_channels * stride), dtype=torch.float64), requires_grad=True)
             self.H1 = nn.Parameter(torch.randn((self.n_x1, self.n_x1), dtype=torch.float64), requires_grad=True)
             self.H2 = nn.Parameter(torch.randn((self.n_x2, self.n_x2), dtype=torch.float64), requires_grad=True)
-            self.psi = nn.Parameter(100*torch.ones((out_channels), dtype=torch.float64), requires_grad=True)
+            self.psi = nn.Parameter(10*torch.ones((out_channels), dtype=torch.float64), requires_grad=True)
             self.q = nn.Parameter(torch.ones((out_channels), dtype=torch.float64), requires_grad=True)
 
         self.in_channels = in_channels

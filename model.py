@@ -4,6 +4,7 @@ from layer import *
 
 def getModel(config):
     models = {
+        'FCModel': FCModel,
         'AllLeNet5': AllLeNet5,
         'LipLeNet5Max': LipLeNet5Max,
         'VanillaLeNet5': VanillaLeNet5,
@@ -18,6 +19,28 @@ def getModel(config):
     return models(config)
 
 #------------------------------------------------------------
+class FCModel(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.in_channels = config.in_channels
+        self.img_size = config.img_size
+        self.num_classes = config.num_classes
+        self.gamma = config.gamma 
+        self.layer = config.layer
+        #self.scale = config.scale
+
+        self.flatten = nn.Flatten()
+        self.FC1 = nn.Linear(32*32,10)
+        #self.FC2 = nn.Linear(64,self.num_classes)
+
+    def forward(self,x):
+        x = self.flatten(x)
+        #x = F.relu(self.FC1(x))
+        x = self.FC1(x)
+
+        return x  
+
+
 class Lip2C2F(nn.Module):
     def __init__(self, config):
         super().__init__()

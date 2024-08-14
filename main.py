@@ -2,7 +2,6 @@ import os
 import warnings
 from argparse import ArgumentParser
 from train import *
-from evaluate import *
 from attack import *
 warnings.filterwarnings("ignore")
 
@@ -39,6 +38,9 @@ def main(args):
     elif config.model == 'VanillaLeNet5':
         config.layer = 'VanillaLeNet5'
         config.gamma = None
+    elif config.model == 'FCModel':
+        config.layer = 'FCModel'
+        config.gamma = None
 
     if config.gamma is None:
         config.train_dir = f"{config.root_dir}_seed{config.seed}/{config.model}-{config.layer}"
@@ -68,26 +70,26 @@ if __name__ == '__main__':
     parser.add_argument('--train_batch_size', type=int, default=256)
     parser.add_argument('--test_batch_size', type=int, default=256)
     parser.add_argument('-d', '--dataset', type=str, default='mnist')
-    #parser.add_argument('--num_workers', type=int, default=4)d
+    #parser.add_argument('--num_workers', type=int, default=4)
     #parser.add_argument('--LLN', action='store_true')
     #parser.add_argument('--normalized', action='store_true')
-    #parser.add_argument('--cert_acc', action='store_true')
+    parser.add_argument('--cert_acc', action='store_true', default=True)
     
     args = parser.parse_args()
 
     #seeds = [1, 123, 296] #[39, 927, 834, 568]
-    seeds = [1,296,123]
+    seeds = [123,296,1]
     #models = ['LipLeNet5', 'VanillaLeNet5','AllLeNet5']
     #models = ['LipLeNet5']
 
     #models = ['All2C2F', 'Lip2C2F']
-    #models = ['Lip2C2FPool']
-    models = ['Lip2C2FPool', 'AOL2C2F'] #'Lip2C2F', 'Vanilla2C2F', 'All2C2F', 'Lip2C2F']
+    #models = ['Lip2C2FPool'] ['Vanilla2C2FPool', 'Vanilla2C2F']
+    models = ['All2C2F', 'Lip2C2F', 'Lip2C2FPool', 'AOL2C2F']
     layers = ['Orthogon', 'Sandwich']
     #gammas = [1.0, 2.0]
     #gammas = [10.0, 20.0, 50.0, 100.0]
     #gammas = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
-    gammas = [8.0, 16.0, 32.0]
+    gammas = [2.0, 4.0]
 
     for seed in seeds:
         args.seed = seed

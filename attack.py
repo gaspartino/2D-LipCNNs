@@ -71,7 +71,3 @@ def PGDL2_attack(config):
 
     #plot_accuracies(epsilons, accuracies)
     return accuracies
-    
-
-
-    
