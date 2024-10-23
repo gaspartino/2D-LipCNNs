@@ -31,6 +31,7 @@ def train(config):
     Lr = config.lr
     steps_per_epoch = len(trainLoader)
     PrintFreq = config.print_freq
+    LLN = config.LLN
     gamma = config.gamma
 
     opt = torch.optim.Adam(model.parameters(), lr=Lr, weight_decay=0)
@@ -86,6 +87,10 @@ def train(config):
         n, Loss, Acc = 0, 0.0, 0.0
         Acc36, Acc72, Acc108 = 0.0, 0.0, 0.0
         model.eval()
+        if LLN:
+            #last_weight = model.model[-1].weight
+            last_weight = model.LipCNNFc2.weight
+            normalized_weight = torch.nn.functional.normalize(last_weight, p=2, dim=1)
 
         if ind == 1:
             gamma = lipschitz_upper_bound(model)
@@ -103,13 +108,25 @@ def train(config):
 
                 if config.cert_acc and epoch == Epochs-1:
                     margins, indices = torch.sort(yh, 1)
-                    cert36 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 36/255.0
-                    cert72 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 72/255.0
-                    cert108= (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma *108/255.0
+                    if LLN:
+                        margins = margins[:, -1][:, None] - margins[: , 0:-1]
+                        for idx in range(margins.shape[0]):
+                            margins[idx] /= torch.norm(
+                                normalized_weight[indices[idx, -1]] - normalized_weight[indices[idx, 0:-1]], dim=1, p=2)
+                        margins, _ = torch.sort(margins, 1)
+                        cert36 = margins[:, 0] > 36.0/255 * gamma
+                        cert72 = margins[:, 0] > 72.0/255 * gamma
+                        cert108= margins[:, 0] > 108.0/255 * gamma
+                    else:
+                        cert36 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 36/255.0
+                        cert72 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 72/255.0
+                        cert108= (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma *108/255.0
 
                     Acc36 += torch.sum(correct & cert36).item()
                     Acc72 += torch.sum(correct & cert72).item()
                     Acc108+= torch.sum(correct & cert108).item()
+
+
 
         test_time = time.time()-start 
         test_loss = Loss/n
@@ -158,7 +175,7 @@ def train(config):
 
     filename = "saved_models.csv"
     #data = [config.model, config.layer, config.seed, config.epochs, gamma, gam, adv_accuracies[0].item(), adv_accuracies[1].item(), adv_accuracies[2].item(), adv_accuracies[3].item(), Acc36, Acc72, Acc108]
-    data = [config.model, config.layer, config.seed, config.epochs, gamma, gam, test_acc, Acc36, Acc72, Acc108]
+    data = [config.model, config.layer, config.seed, config.epochs, gamma, gam, test_acc, Acc36, Acc72, Acc108, LLN]
 
     # Open the file in append mode
     with open(filename, mode='a', newline='') as file:

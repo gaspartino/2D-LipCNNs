@@ -20,7 +20,7 @@ def main(args):
     config.offset = 1.5
 
     if config.model == 'Lip2C2F':
-        config.layer = 'LipC2F'
+        config.layer = 'Lip2C2F'
     elif config.model == 'Lip2C2FPool':
         config.layer = 'LipC2FPool'
     elif config.model == 'Vanilla2C2F':
@@ -44,6 +44,8 @@ def main(args):
 
     if config.gamma is None:
         config.train_dir = f"{config.root_dir}_seed{config.seed}/{config.model}-{config.layer}"
+    elif config.LLN:
+        config.train_dir = f"{config.root_dir}_seed{config.seed}/{config.model}-{config.layer}-LLN-gamma{config.gamma:.1f}"
     else:
         config.train_dir = f"{config.root_dir}_seed{config.seed}/{config.model}-{config.layer}-gamma{config.gamma:.1f}"
 
@@ -71,7 +73,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_batch_size', type=int, default=256)
     parser.add_argument('-d', '--dataset', type=str, default='mnist')
     #parser.add_argument('--num_workers', type=int, default=4)
-    #parser.add_argument('--LLN', action='store_true')
+    parser.add_argument('--LLN', action='store_true', default=True)
     #parser.add_argument('--normalized', action='store_true')
     parser.add_argument('--cert_acc', action='store_true', default=True)
     
@@ -84,12 +86,12 @@ if __name__ == '__main__':
 
     #models = ['All2C2F', 'Lip2C2F']
     #models = ['Lip2C2FPool'] ['Vanilla2C2FPool', 'Vanilla2C2F']
-    models = ['All2C2F', 'Lip2C2F', 'Lip2C2FPool', 'AOL2C2F']
-    layers = ['Orthogon', 'Sandwich']
+    models = ['All2C2F']#, 'Lip2C2FPool', 'AOL2C2F', 'All2C2F', ]
+    layers = ['Sandwich','Orthogon']
     #gammas = [1.0, 2.0]
     #gammas = [10.0, 20.0, 50.0, 100.0]
     #gammas = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
-    gammas = [2.0, 4.0]
+    gammas = [1.0, 2.0, 4.0]
 
     for seed in seeds:
         args.seed = seed
@@ -100,7 +102,7 @@ if __name__ == '__main__':
             # Check if the current model allows gamma settings
             if model in ['All2C2F', 'Lip2C2F','AOL2C2F','Lip2C2FPool']:
                 for gamma in gammas:
-                    args.gamma =gamma
+                    args.gamma = gamma
                     print(f"Running with gamma: {gamma}")
                     if model == 'All2C2F':
                         for layer in layers:
