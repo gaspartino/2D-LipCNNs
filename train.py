@@ -31,15 +31,15 @@ def train(config):
     Lr = config.lr
     steps_per_epoch = len(trainLoader)
     PrintFreq = config.print_freq
-    LLN = config.LLN
+#    LLN = config.LLN
     gamma = config.gamma
 
     opt = torch.optim.Adam(model.parameters(), lr=Lr, weight_decay=0)
     lr_schedule = lambda t: np.interp([t], [0, Epochs*2//5, Epochs*4//5, Epochs], [0, Lr, Lr/20.0, 0])[0]
 
     tloss_step, tacc_step, lr_step = [], [], []
-    ttime_epoch,vtime_epoch,tloss_epoch,vloss_epoch,tacc_epoch, vacc_epoch = [],[],[],[],[],[]
-    vacc_epoch,acc36_epoch,acc72_epoch,acc108_epoch = [], [], [], []
+    ttime_epoch,vtime_epoch,tloss_epoch,vloss_epoch,tacc_epoch, vacc_epoch, vacc_epoch = [],[],[],[],[],[],[]
+    #vacc_epoch,acc36_epoch,acc72_epoch,acc108_epoch = [], [], [], []
 
     ind = 0
     if gamma == None:
@@ -85,12 +85,13 @@ def train(config):
         model(torch.rand((1,x.shape[1], x.shape[2], x.shape[3])).to(x.device)) 
 
         n, Loss, Acc = 0, 0.0, 0.0
-        Acc36, Acc72, Acc108 = 0.0, 0.0, 0.0
+        #Acc36, Acc72, Acc108 = 0.0, 0.0, 0.0
+        Acc1, Acc2, Acc3, Acc1_58 = 0.0, 0.0, 0.0, 0.0
         model.eval()
-        if LLN:
-            #last_weight = model.model[-1].weight
-            last_weight = model.LipCNNFc2.weight
-            normalized_weight = torch.nn.functional.normalize(last_weight, p=2, dim=1)
+#        if LLN:
+#            #last_weight = model.model[-1].weight
+#            last_weight = model.LipCNNFc2.weight
+#            normalized_weight = torch.nn.functional.normalize(last_weight, p=2, dim=1)
 
         if ind == 1:
             gamma = lipschitz_upper_bound(model)
@@ -108,23 +109,32 @@ def train(config):
 
                 if config.cert_acc and epoch == Epochs-1:
                     margins, indices = torch.sort(yh, 1)
-                    if LLN:
-                        margins = margins[:, -1][:, None] - margins[: , 0:-1]
-                        for idx in range(margins.shape[0]):
-                            margins[idx] /= torch.norm(
-                                normalized_weight[indices[idx, -1]] - normalized_weight[indices[idx, 0:-1]], dim=1, p=2)
-                        margins, _ = torch.sort(margins, 1)
-                        cert36 = margins[:, 0] > 36.0/255 * gamma
-                        cert72 = margins[:, 0] > 72.0/255 * gamma
-                        cert108= margins[:, 0] > 108.0/255 * gamma
-                    else:
-                        cert36 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 36/255.0
-                        cert72 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 72/255.0
-                        cert108= (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma *108/255.0
+                    #if LLN:
+                    #    margins = margins[:, -1][:, None] - margins[: , 0:-1]
+                    #    for idx in range(margins.shape[0]):
+                    #        margins[idx] /= torch.norm(
+                    #            normalized_weight[indices[idx, -1]] - normalized_weight[indices[idx, 0:-1]], dim=1, p=2)
+                    #    margins, _ = torch.sort(margins, 1)
+                    #    #cert36 = margins[:, 0] > 36.0/255 * gamma
+                    #    #cert72 = margins[:, 0] > 72.0/255 * gamma
+                    #    #cert108= margins[:, 0] > 108.0/255 * gamma
+                    #    cert1 = margins[:, 0] > 1.0 * gamma
+                    #    cert2 = margins[:, 0] > 2.0 * gamma
+                    #    cert3 = margins[:, 0] > 3.0 * gamma
+                    #    cert1_58 = margins[:, 0] > 1.58 * gamma
+                    #else:
+                    #cert36 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 36/255.0
+                    #cert72 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 72/255.0
+                    #cert108= (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma *108/255.0
+                    cert1 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 1.0
+                    cert2 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 2.0
+                    cert3 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 3.0
+                    cert1_58 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 1.58
 
-                    Acc36 += torch.sum(correct & cert36).item()
-                    Acc72 += torch.sum(correct & cert72).item()
-                    Acc108+= torch.sum(correct & cert108).item()
+                    Acc1 += torch.sum(correct & cert1).item()
+                    Acc2 += torch.sum(correct & cert2).item()
+                    Acc3 += torch.sum(correct & cert3).item()
+                    Acc1_58 += torch.sum(correct & cert1_58).item()
 
 
 
@@ -145,12 +155,17 @@ def train(config):
         if epoch % config.save_freq == 0 or epoch + 1 == Epochs:
             torch.save(model.state_dict(), f"{config.train_dir}/model.ckpt")
 
-    Acc36 = 100.0*Acc36/n 
-    Acc72 = 100.0*Acc72/n
-    Acc108= 100.0*Acc108/n
-    print(f"Epsilon: 36 \tAccuracy: {Acc36:.4f}")
-    print(f"Epsilon: 72 \tAccuracy: {Acc72:.4f}")
-    print(f"Epsilon: 108 \tAccuracy: {Acc108:.4f}")
+    #Acc36 = 100.0*Acc36/n 
+    #Acc72 = 100.0*Acc72/n
+    #Acc108= 100.0*Acc108/n
+    Acc1 = 100.0*Acc1/n 
+    Acc2 = 100.0*Acc2/n
+    Acc3= 100.0*Acc3/n
+    Acc1_58= 100.0*Acc1_58/n
+    print(f"Epsilon: 1.0 \tAccuracy: {Acc1:.4f}")
+    print(f"Epsilon: 2.0 \tAccuracy: {Acc2:.4f}")
+    print(f"Epsilon: 3.0 \tAccuracy: {Acc3:.4f}")
+    print(f"Epsilon: 1.58 \tAccuracy: {Acc1_58:.4f}")
 
     # after training
     np.savetxt(f'{config.train_dir}/tloss_step.csv',np.array(tloss_step))
@@ -171,11 +186,11 @@ def train(config):
     else:
         txtlog(f"Lipschitz capcity: {gam:.4f}/{gamma:.2f}, {100*gam/gamma:.2f}")
 
-    #adv_accuracies = PGDL2_attack(config)
+    adv_accuracies = PGDL2_attack(config)
 
     filename = "saved_models.csv"
     #data = [config.model, config.layer, config.seed, config.epochs, gamma, gam, adv_accuracies[0].item(), adv_accuracies[1].item(), adv_accuracies[2].item(), adv_accuracies[3].item(), Acc36, Acc72, Acc108]
-    data = [config.model, config.layer, config.seed, config.epochs, gamma, gam, test_acc, Acc36, Acc72, Acc108, LLN]
+    data = [config.model, config.layer, config.seed, config.epochs, gamma, gam, test_acc, adv_accuracies[0].item(), adv_accuracies[1].item(), adv_accuracies[2].item(), adv_accuracies[3].item(), adv_accuracies[4].item(), Acc1, Acc2, Acc3, Acc1_58]
 
     # Open the file in append mode
     with open(filename, mode='a', newline='') as file:
