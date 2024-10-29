@@ -44,8 +44,6 @@ def main(args):
 
     if config.gamma is None:
         config.train_dir = f"{config.root_dir}_seed{config.seed}/{config.model}-{config.layer}"
-    #elif config.LLN:
-    #    config.train_dir = f"{config.root_dir}_seed{config.seed}/{config.model}-{config.layer}-LLN-gamma{config.gamma:.1f}"
     else:
         config.train_dir = f"{config.root_dir}_seed{config.seed}/{config.model}-{config.layer}-gamma{config.gamma:.1f}"
 
@@ -72,25 +70,15 @@ if __name__ == '__main__':
     parser.add_argument('--train_batch_size', type=int, default=256)
     parser.add_argument('--test_batch_size', type=int, default=256)
     parser.add_argument('-d', '--dataset', type=str, default='mnist')
-    #parser.add_argument('--num_workers', type=int, default=4)
-    #parser.add_argument('--LLN', action='store_true', default=True)
-    #parser.add_argument('--normalized', action='store_true')
     parser.add_argument('--cert_acc', action='store_true', default=True)
     
     args = parser.parse_args()
 
-    #seeds = [1, 123, 296] #[39, 927, 834, 568]
-    seeds = [123,296,1]
-    #models = ['LipLeNet5', 'VanillaLeNet5','AllLeNet5']
-    #models = ['LipLeNet5']
+    seeds = [1,123,296,1]
 
-    #models = ['All2C2F', 'Lip2C2F']
-    #models = ['Lip2C2FPool'] ['Vanilla2C2FPool', 'Vanilla2C2F']
-    models = ['Lip2C2F','All2C2F', 'Lip2C2FPool', 'AOL2C2F']
+    models = ['Lip2C2F', 'Lip2C2FPool', 'All2C2F', 'AOL2C2F', 'Vanilla2C2F']
     layers = ['Sandwich','Orthogon']
-    #gammas = [1.0, 2.0]
-    #gammas = [10.0, 20.0, 50.0, 100.0]
-    #gammas = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+
     gammas = [1.0, 2.0, 4.0]
 
     for seed in seeds:
@@ -99,7 +87,6 @@ if __name__ == '__main__':
             args.model = model
             print(f"Running with seed: {seed}, model: {model}")
        
-            # Check if the current model allows gamma settings
             if model in ['All2C2F', 'Lip2C2F','AOL2C2F','Lip2C2FPool']:
                 for gamma in gammas:
                     args.gamma = gamma
@@ -110,37 +97,6 @@ if __name__ == '__main__':
                             print(f"Running with layer: {layer}")
                             main(args)
                     else:
-                        #args.layer = 'Lip2C2F'
                         main(args)
-                    # Call your function or perform actions here with seed, model, and gamma
             else:
-                # Call your function or perform actions here with seed and model (no gamma)
-                #args.layer = 'Vanilla2C2F'
                 main(args)
-
-    # for seed in seeds:
-    #     args.seed = seed
-    #     for model in models:
-    #         args.model = model
-    #         print(f"Running with seed: {seed}, model: {model}")
-        
-    #         # Check if the current model allows gamma settings
-    #         if model in ['VanillaLeNet5']:
-    #             args.layer = 'VanillaLeNet5'
-    #             main(args)
-    #         else:
-    #             for gamma in gammas:
-    #                 args.gamma =gamma
-    #                 print(f"Running with gamma: {gamma}")
-    #                 if model == 'AllLeNet5':
-    #                     args.layer = 'Aol'
-    #                     main(args)
-    #                 else:
-    #                     args.layer = 'LipLeNet5'
-    #                     main(args)
-
-    #for seed in seeds:
-    #    args.seed = seed
-    #    for gamma in gammas:
-    #        args.gamma =gamma
-    #        main(args)
