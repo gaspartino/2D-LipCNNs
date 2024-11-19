@@ -84,7 +84,7 @@ def train(config):
 
         n, Loss, Acc = 0, 0.0, 0.0
         Acc36, Acc72, Acc108 = 0.0, 0.0, 0.0
-        #Acc1, Acc2, Acc3, Acc1_58 = 0.0, 0.0, 0.0, 0.0
+        Acc1, Acc2, Acc3, Acc1_58 = 0.0, 0.0, 0.0, 0.0
         model.eval()
 #        if LLN:
 #            #last_weight = model.model[-1].weight
@@ -110,10 +110,10 @@ def train(config):
                     cert36 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 36/255.0
                     cert72 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 72/255.0
                     cert108= (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma *108/255.0
-                    #cert1 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 1.0
-                    #cert2 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 2.0
-                    #cert3 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 3.0
-                    #cert1_58 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 1.58
+                    cert1 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 1.0
+                    cert2 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 2.0
+                    cert3 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 3.0
+                    cert1_58 = (margins[:, -1] - margins[:, -2]) > np.sqrt(2.) * gamma * 1.58
 
                     Acc1 += torch.sum(correct & cert1).item()
                     Acc2 += torch.sum(correct & cert2).item()
@@ -142,10 +142,10 @@ def train(config):
     Acc36 = 100.0*Acc36/n 
     Acc72 = 100.0*Acc72/n
     Acc108= 100.0*Acc108/n
-    #Acc1 = 100.0*Acc1/n 
-    #Acc2 = 100.0*Acc2/n
-    #Acc3= 100.0*Acc3/n
-    #Acc1_58= 100.0*Acc1_58/n
+    Acc1 = 100.0*Acc1/n 
+    Acc2 = 100.0*Acc2/n
+    Acc3= 100.0*Acc3/n
+    Acc1_58= 100.0*Acc1_58/n
     print(f"Epsilon: 36 \tAccuracy: {Acc36:.4f}")
     print(f"Epsilon: 72 \tAccuracy: {Acc72:.4f}")
     print(f"Epsilon: 108 \tAccuracy: {Acc108:.4f}")
