@@ -20,6 +20,9 @@ def plot_accuracies(epsilons, accuracies):
     plt.grid()
     plt.show()
 
+import matplotlib.pyplot as plt
+import numpy as np
+
 def PGDL2_attack(config):
     #seed_everything(config.seed)
     #model = getModel(config)
@@ -44,12 +47,37 @@ def PGDL2_attack(config):
     model.load_state_dict(model_state)
     model(x) # update Q param
 
-    #epsilons = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
-    epsilons = [0.0, 1.0, 2.0, 3.0, 1.58]
+    num_classes = len(set(testLoader.dataset.targets.numpy()))  # Acessando as classes no dataset MNIST
+    print(f'Número de classes: {num_classes}')
+
+    epsilons = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
+    #epsilons = [0.0, 1.0, 2.0, 3.0, 1.58]
     accuracies = []
 
     for epsilon in epsilons:
-        attack = torchattacks.PGDL2(model, eps = epsilon)
+        pgdl2 = torchattacks.PGDL2(model, eps = epsilon)
+        bim = torchattacks.BIM(model, eps=epsilon, alpha=2/255, steps=10)
+        fgsm = torchattacks.FGSM(model, eps=epsilon)
+        pgd = torchattacks.PGD(model, eps=epsilon, alpha=2/255, steps=10, random_start=True)
+
+        correct = 0
+        total = 0
+
+        for images, labels in testLoader:
+            #if epsilon == 0:
+            #    adv_images = images
+            #else:
+            adv_images = pgdl2(images, labels)
+            outputs = model(adv_images)
+            _, predicted = torch.max(outputs.data, 1)
+
+            correct += (predicted == labels).sum()
+            total += labels.size(0)
+
+        accuracy = correct / total
+
+        accuracies.append(accuracy)
+        print(f"PGDL2 | Epsilon: {epsilon}\tAccuracy: {accuracy:.4f}")
         
         correct = 0
         total = 0
@@ -58,16 +86,56 @@ def PGDL2_attack(config):
             #if epsilon == 0:
             #    adv_images = images
             #else:
-            adv_images = attack(images, labels)
+            adv_images = pgd(images, labels)
             outputs = model(adv_images)
             _, predicted = torch.max(outputs.data, 1)
+
             correct += (predicted == labels).sum()
             total += labels.size(0)
 
         accuracy = correct / total
 
         accuracies.append(accuracy)
-        print(f"Epsilon: {epsilon}\tAccuracy: {accuracy:.4f}")
+        print(f"PGD | Epsilon: {epsilon}\tAccuracy: {accuracy:.4f}")
 
+        correct = 0
+        total = 0
+
+        for images, labels in testLoader:
+            #if epsilon == 0:
+            #    adv_images = images
+            #else:
+            adv_images = fgsm(images, labels)
+            outputs = model(adv_images)
+            _, predicted = torch.max(outputs.data, 1)
+
+            correct += (predicted == labels).sum()
+            total += labels.size(0)
+
+        accuracy = correct / total
+
+        accuracies.append(accuracy)
+        print(f"FGSM | Epsilon: {epsilon}\tAccuracy: {accuracy:.4f}")
+
+        correct = 0
+        total = 0
+
+        for images, labels in testLoader:
+            #if epsilon == 0:
+            #    adv_images = images
+            #else:
+            adv_images = bim(images, labels)
+            outputs = model(adv_images)
+            _, predicted = torch.max(outputs.data, 1)
+
+            correct += (predicted == labels).sum()
+            total += labels.size(0)
+
+        accuracy = correct / total
+
+        accuracies.append(accuracy)
+        print(f"BIM | Epsilon: {epsilon}\tAccuracy: {accuracy:.4f}")
+
+        print("")
     #plot_accuracies(epsilons, accuracies)
     return accuracies
