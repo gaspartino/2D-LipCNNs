@@ -1,4 +1,4 @@
-from torchvision.datasets import MNIST
+from torchvision.datasets import MNIST, ImageFolder
 from torch.utils.data import DataLoader
 from torchvision import transforms
 import os
@@ -62,3 +62,13 @@ def cars_loaders(config):
     testLoader = DataLoader(test_dataset, batch_size=config.test_batch_size, shuffle=False, pin_memory=True)
 
     return trainLoader, testLoader
+
+# Exemplo de uso
+class Config:
+    train_batch_size = 64
+    test_batch_size = 64
+    dataset = 'cars'
+
+config = Config()
+
+trainLoader, testLoader = getDataLoader(config)
