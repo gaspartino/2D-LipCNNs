@@ -52,8 +52,8 @@ def cars_loaders(config):
         # Adicione transforms.Normalize se necessário
     ])
 
-    train_path = os.path.join(dataset_path, 'Train')  # Subpasta Train
-    test_path = os.path.join(dataset_path, 'Test')    # Subpasta Test
+    train_path = os.path.join(dataset_path, 'train')  # Subpasta Train
+    test_path = os.path.join(dataset_path, 'test')    # Subpasta Test
 
     train_dataset = ImageFolder(root=train_path, transform=transform)
     test_dataset = ImageFolder(root=test_path, transform=transform)
