@@ -13,9 +13,9 @@ def main(args):
     config.print_freq = 10
     config.save_freq = 5
     config.dataset == 'mnist'
-    config.in_channels = 1
-    config.img_size = 32
-    config.num_classes = 10
+    config.in_channels = 3
+    config.img_size = 100
+    config.num_classes = 7
     config.loss = 'xent'
     config.offset = 1.5
 
@@ -74,12 +74,12 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
 
-    seeds = [1,123,296,1]
+    seeds = [42]
 
-    models = ['Lip2C2F', 'Lip2C2FPool', 'All2C2F', 'AOL2C2F', 'Vanilla2C2F']
-    layers = ['Sandwich','Orthogon']
+    models = ['Lip2C2FPool']
+    layers = ['Sandwich']
 
-    gammas = [1.0, 2.0, 4.0]
+    gammas = [1.0]
 
     for seed in seeds:
         args.seed = seed
