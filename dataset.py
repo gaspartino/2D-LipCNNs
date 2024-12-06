@@ -42,11 +42,9 @@ def get_loaders(dir_, batch_size, DATASET='CIFAR10'):
         test_dataset = datasets.CIFAR100(
             dir_, train=False, transform=test_transform, download=True)
     elif DATASET == 'CUSTOM':
-        dataset_path = '/kaggle/input/flowers-dataset'
-
-        train_path = os.path.join(dataset_path, 'train')  
-        test_path = os.path.join(dataset_path, 'test')    
-        valid_path = os.path.join(dataset_path, 'valid')    
+        train_path = '/kaggle/input/flowers-dataset/train' 
+        test_path = '/kaggle/input/flowers-dataset/test' 
+        valid_path = '/kaggle/input/flowers-dataset/valid'    
 
         train_dataset = datasets.ImageFolder(root=train_path, transform=train_transform)
         test_dataset = datasets.ImageFolder(root=test_path, transform=test_transform)
