@@ -48,7 +48,7 @@ def get_loaders(dir_, batch_size, DATASET='CIFAR10'):
 
         train_dataset = datasets.ImageFolder(root=train_path, transform=train_transform)
         test_dataset = datasets.ImageFolder(root=test_path, transform=test_transform)
-        train_loader__ = datasets.ImageFolder(root=valid_path, transform=test_transform)
+        train_dataset__ = datasets.ImageFolder(root=valid_path, transform=test_transform)
 
     train_loader = torch.utils.data.DataLoader(
         dataset=train_dataset,
