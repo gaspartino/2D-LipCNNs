@@ -38,16 +38,35 @@ def construct_AB(n_x, n_u):
     return A, B
 
 def findP1P2(H1, H2, A12, B1, Qm, cin, cout, r, s):
+
+    # Garantir que todos os tensores estão no mesmo dispositivo
+    device = B1.device  # Pegamos o device de B1 (pode ser CPU ou CUDA)
+    H1 = H1.to(device)
+    H2 = H2.to(device)
+    A12 = A12.to(device)
+    B1 = B1.to(device)
+    Qm = Qm.to(device)
+
+
     n_u = Qm.shape[0]
     n_x1 = H1.shape[0]
     n_x2 = H2.shape[0]
     n_y = cout
     epsilon = 1e-6
     A11, A22, B2, _ = construct_A11A22B2C1(cin, cout, r, s)
+    A11 = A11.to(device)     # Construção das matrizes e movimentação para o mesmo device
+    A22 = A22.to(device)
+    B2 = B2.to(device)
+
     B = torch.cat((B1, B2), dim = 0)
     if s > 1:
-        Qm = torch.kron(torch.eye(s**2),Qm)
+        Qm = torch.kron(torch.eye(s**2, device=device),Qm)
     Qminv = torch.linalg.inv(Qm)
+    # Garantir que B1, B2 e Qminv estão no mesmo device
+    B1 = B1.to(device)
+    B2 = B2.to(device)
+    Qminv = Qminv.to(device)
+
     Xtilde = torch.cat((torch.cat((B1 @ Qminv @ B1.T, B1 @ Qminv @ B2.T), dim = 1), torch.cat((B2 @ Qminv @ B1.T, B2 @ Qminv @ B2.T), dim = 1)), dim = 0) #+ epsilon * torch.eye(n_x1+n_x2)
     Xtilde = (Xtilde + Xtilde.T) / 2
     Xtilde22 = Xtilde[n_x1:, n_x1:]
@@ -55,35 +74,54 @@ def findP1P2(H1, H2, A12, B1, Qm, cin, cout, r, s):
     Xtilde12 = Xtilde[:n_x1, n_x1:]
 
     # Compute T2
-    T2 = torch.zeros((n_x2, n_x2), dtype = torch.float64)
+    T2 = torch.zeros((n_x2, n_x2), dtype = torch.float64, device=device)
     for k in range(n_x2 - n_u + 1):
-        T2 += torch.matrix_power(A22, k) @ (Xtilde22 + H2.T @ H2 + epsilon * torch.eye(n_x2)) @ torch.matrix_power(A22, k).T
+        T2 += torch.matrix_power(A22, k) @ (Xtilde22 + H2.T @ H2 + epsilon * torch.eye(n_x2, device=device)) @ torch.matrix_power(A22, k).T
 
     # Compute Xhat11
     Xhat11 = A12 @ T2 @ A12.T + Xtilde11 + (Xtilde12 + A12 @ T2 @ A22.T) @ torch.inverse(T2 - A22 @ T2 @ A22.T - Xtilde22) @ (Xtilde12 + A12 @ T2 @ A22.T).T
     
     # Compute T1
-    T1 = torch.zeros((n_x1, n_x1), dtype = torch.float64)
+    T1 = torch.zeros((n_x1, n_x1), dtype = torch.float64, device=device)
     for k in range(n_x1 - n_y + 1):
-        T1 += torch.matrix_power(A11, k) @ (Xhat11 + H1.T @ H1 + epsilon * torch.eye(n_x1)) @ torch.matrix_power(A11, k).T
+        T1 += torch.matrix_power(A11, k) @ (Xhat11 + H1.T @ H1 + epsilon * torch.eye(n_x1, device=device)) @ torch.matrix_power(A11, k).T
     
     P1 = torch.inverse(T1)
     P2 = torch.inverse(T2)
 
+    # Garantir que as inversas estão no mesmo device
+    P1 = torch.inverse(T1).to(device)
+    P2 = torch.inverse(T2).to(device)
+
     return P1, P2
 
 def findF_2D(P1, P2, A12, B1, Qm, cin, cout, r, s):
+    
+    # Obtém o device de um dos tensores (assumindo que pelo menos um está na GPU)
+    device = P1.device  
+
+    # Move todos os tensores para o mesmo device
+    P1 = P1.to(device)
+    P2 = P2.to(device)
+    A12 = A12.to(device)
+    B1 = B1.to(device)
+    Qm = Qm.to(device)
+    
     P = block_diagonal(P1,P2)
     n_x1 = P1.shape[0]
     n_x2 = P2.shape[0]
     A11, A22, B2, _ = construct_A11A22B2C1(cin, cout, r, s)
+    A11 = A11.to(device)
+    A22 = A22.to(device)
+    B2  = B2.to(device)
+
     A21 = torch.zeros((n_x2, n_x1))
 
-    A = torch.cat((torch.cat((A11, A12), dim = 1), torch.cat((A21, A22), dim = 1)), dim = 0)
-    B = torch.cat((B1, B2), dim = 0)
+    A = torch.cat((torch.cat((A11.to(device), A12.to(device)), dim = 1), torch.cat((A21.to(device), A22.to(device)), dim = 1)), dim = 0)
+    B = torch.cat((B1.to(device), B2.to(device)), dim = 0)
 
     if s > 1:
-        Qm = torch.kron(torch.eye(s**2),Qm)
+        Qm = torch.kron(torch.eye(s**2, device=device),Qm)
 
     F_upper_left = P - A.T @ P @ A
     F_upper_right = - A.T @ P @ B
@@ -94,9 +132,10 @@ def findF_2D(P1, P2, A12, B1, Qm, cin, cout, r, s):
 
 def flatten_stride(mat, cout):
     len_ = mat.shape[0] // cout
-    mat2 = torch.empty((cout,0))
+    device = mat.device
+    mat2 = torch.empty((cout,0), device=device)
     for ii in range(1, len_ + 1):
-        mat2 = torch.cat((mat2, mat[(ii-1)*cout:ii*cout, :]),dim=1)
+        mat2 = torch.cat((mat2, mat[(ii-1)*cout:ii*cout, :].to(device)),dim=1)
     return mat2
 
 def construct_A11A22B2C1(cin, cout, kernel, s):
@@ -167,12 +206,19 @@ def ABCD2K(A12,B1,C2,D,l,s):
         B1flat = torch.empty((cout, 0))
         C2flat = C2
         Dflat = D
-    
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # passando para o device correto
+        A12flat = A12flat.to(device) 
+        B1flat = B1flat.to(device)
+        # print("layer.py, 214", device)
         # Loop to concatenate slices of A12 and B1
         for ii in range(1, int(np.ceil((l1 - s) / s)) + 1):
-            A12flat = torch.cat((A12flat, A12[(ii-1)*cout:ii*cout, :]),dim=1)
-            B1flat = torch.cat((B1flat, B1[(ii-1)*cout:ii*cout, :]),dim=1)
-    
+            A12flat = torch.cat((A12flat, A12[(ii-1)*cout:ii*cout, :].to(device)),dim=1)
+            B1flat = torch.cat((B1flat, B1[(ii-1)*cout:ii*cout, :].to(device)),dim=1)
+            # print("DEVICE ***********", A12flat.device, B1flat.device)
+
+
         # Calculate r
         r = s - (l1 - s) % s
     
@@ -187,15 +233,22 @@ def ABCD2K(A12,B1,C2,D,l,s):
         C2 = torch.empty((0, (l2-s)*cin))
         D = torch.empty((0, s*cin))
     
+        # Colocando nos dispositivos apropriados:
+        device = A12.device  # Obtém o device do tensor A12
+        A12flat = A12flat.to(device)  # Move A12flat para o mesmo device de A12
+        B1 = B1.to(device)
+        C2 = C2.to(device)
+        D  = D.to(device)
+
         # Loop to concatenate slices of A12flat and B1flat
         for ii in range(l1 - s):
-            A12 = torch.cat((A12, A12flat[:, ii*(l2-s)*cin:(ii+1)*(l2-s)*cin]), dim = 0)
-            B1 = torch.cat((B1, B1flat[:, ii*s*cin:(ii+1)*s*cin]), dim = 0)
+            A12 = torch.cat((A12, A12flat[:, ii*(l2-s)*cin:(ii+1)*(l2-s)*cin].to(device)), dim = 0)
+            B1 = torch.cat((B1, B1flat[:, ii*s*cin:(ii+1)*s*cin].to(device)), dim = 0)
         
         # Loop to concatenate slices of C2flat and Dflat
         for ii in range(s):
-            C2 = torch.cat((C2, C2flat[:, ii*(l2-s)*cin:(ii+1)*(l2-s)*cin]), dim = 0)
-            D = torch.cat((D, Dflat[:, ii*s*cin:(ii+1)*s*cin]), dim = 0)
+            C2 = torch.cat((C2, C2flat[:, ii*(l2-s)*cin:(ii+1)*(l2-s)*cin].to(device)), dim = 0)
+            D = torch.cat((D, Dflat[:, ii*s*cin:(ii+1)*s*cin].to(device)), dim = 0)
         
     # Combine A12, B1, C2, and D into the final matrix
     mat = torch.cat((torch.cat((A12, B1), dim = 1), torch.cat((C2, D), dim = 1)), dim = 0)
@@ -213,9 +266,16 @@ def ABCD2K(A12,B1,C2,D,l,s):
     return K
 
 def reshape_A12B1(A12t, B1t, cout, cin, r, s):
+    # Definir o device com base no tensor de entrada
+    device = A12t.device
+
+    # Garantir que os tensores de entrada estão no mesmo device
+    A12t = A12t.to(device)
+    B1t = B1t.to(device) 
+
     # Flattening matrices
-    A12flat = flatten_stride(A12t, cout)
-    B1flat = flatten_stride(B1t, cout)
+    A12flat = flatten_stride(A12t, cout).to(device)
+    B1flat = flatten_stride(B1t, cout).to(device)
     l1 = r
     l2 = r
 
@@ -224,12 +284,12 @@ def reshape_A12B1(A12t, B1t, cout, cin, r, s):
         
     # If condition and padding with zeros
     if r != s:
-        A12flat = torch.cat((torch.zeros((cout, r * cin * (l2 - s))), A12flat), dim = 1)
-        B1flat = torch.cat((torch.zeros((cout, r * cin * s)), B1flat), dim = 1)
+        A12flat = torch.cat((torch.zeros((cout, r * cin * (l2 - s)),device=device), A12flat), dim = 1)
+        B1flat = torch.cat((torch.zeros((cout, r * cin * s),device=device), B1flat), dim = 1)
             
     # Initialize empty arrays
-    A12 = torch.empty((0, cin * (l2 - s) * s))
-    B1 = torch.empty((0, cin * s**2))
+    A12 = torch.empty((0, cin * (l2 - s) * s), device=device)
+    B1 = torch.empty((0, cin * s**2), device=device)
         
     # Loop to concatenate slices of A12flat and B1flat
     for ii in range(1, int(np.ceil((l1 - s) / s)) + 1):
@@ -513,6 +573,7 @@ class LipCNNConv(nn.Module):
         self.n_x2 = in_channels*(kernel-stride)*stride
         self.n_u = in_channels*stride**2
         self.n_y = out_channels
+        self.Q = None
 
         init2C2F=False
 
@@ -578,11 +639,16 @@ class LipCNNConv(nn.Module):
         F1 = Fmat[:n_x1, :n_x1]
         F2 = Fmat[n_x1:, n_x1:]
         F12 = Fmat[:n_x1, n_x1:] 
-        F1inv = torch.linalg.inv(F1 + 0 * torch.eye(n_x1))
+        device = F1.device  # Obtém o dispositivo de F1
+        #print("DEVICE =", device)
+        F1inv = torch.linalg.inv(F1 + 0 * torch.eye(n_x1, device=device))
 
         _, _, _, C1 = construct_A11A22B2C1(cin, cout, r, s)
 
+        F1inv = F1inv.to(device)  # Move F1inv para o mesmo dispositivo de C1
+        C1 = C1.to(device)
         mat = 0.5 * C1 @ (F1inv+F1inv.T) @ C1.T
+        #print("DEVICE ==============",C1.device, F1inv.device)
 
         gamma = epsilon + self.psi ** 2
         gamma += 0.5 * torch.sum(torch.abs(mat), dim=1) # Diagonal dominance
@@ -597,7 +663,7 @@ class LipCNNConv(nn.Module):
         try:
             LGamma = torch.linalg.cholesky(2*torch.diag(gamma) - mat)
         except RuntimeError:
-            F1inv = torch.linalg.inv(F1 + 1e-12 * torch.eye(n_x1))
+            F1inv = torch.linalg.inv(F1 + 1e-12 * torch.eye(n_x1, device = device))
 
             mat = 0.5 * C1 @ (F1inv+F1inv.T) @ C1.T
             gamma = epsilon + self.psi ** 2
@@ -610,25 +676,25 @@ class LipCNNConv(nn.Module):
             arg = F2 - F12.T @ F1inv @ F12
             LF = torch.linalg.cholesky(arg) # + epsilon * torch.eye(n_x2+n_u))
         except RuntimeError:
-            F1inv = torch.linalg.inv(F1 + 1e-12 * torch.eye(n_x1))
+            F1inv = torch.linalg.inv(F1 + 1e-12 * torch.eye(n_x1, device = device))
             arg = F2 - F12.T @ F1inv @ F12
             try: 
-                LF = torch.linalg.cholesky(arg + 1e-12 * torch.eye(n_x2+n_u))
+                LF = torch.linalg.cholesky(arg + 1e-12 * torch.eye(n_x2+n_u, device = device))
                 #print('cheat1')
             except RuntimeError:
                 try:
-                    LF = torch.linalg.cholesky(arg + 1e-10 * torch.eye(n_x2+n_u))
+                    LF = torch.linalg.cholesky(arg + 1e-10 * torch.eye(n_x2+n_u, device = device))
                     print('cheat2')
                 except RuntimeError:
                     try:
-                        LF = torch.linalg.cholesky(arg + 1e-8 * torch.eye(n_x2+n_u))
+                        LF = torch.linalg.cholesky(arg + 1e-8 * torch.eye(n_x2+n_u, device = device))
                         print('cheat3')
                     except RuntimeError:
                         try:
-                            LF = torch.linalg.cholesky(arg + 1e-6 * torch.eye(n_x2+n_u))
+                            LF = torch.linalg.cholesky(arg + 1e-6 * torch.eye(n_x2+n_u, device = device))
                             print('cheat4')
                         except RuntimeError:
-                            LF = torch.linalg.cholesky(arg + 1e-4 * torch.eye(n_x2+n_u))
+                            LF = torch.linalg.cholesky(arg + 1e-4 * torch.eye(n_x2+n_u, device = device))
                             print('cheat5')
 
         C2hat =  C1 @ F1inv @ F12 - LGamma @ V.T @ LF.T
@@ -647,9 +713,11 @@ class LipCNNConv(nn.Module):
         p = self.padding
         r = self.kernel
 
-        x = F.conv2d(x, K.float(), padding = p, stride = s)
+        #print("DEVICE do x = ", x.device)
+        x = F.conv2d(x, K.to(x.device).float(), padding=p, stride=s)
         if self.bias is not None:
-            x += self.bias[:, None, None]
+            # print("layer.py 718", x.device)
+            x += self.bias.to(x.device)[:, None, None]
         return x, L
 
 
@@ -719,7 +787,9 @@ class LipCNNConvMax(nn.Module):
         F1 = Fmat[:n_x1, :n_x1]
         F2 = Fmat[n_x1:, n_x1:]
         F12 = Fmat[:n_x1, n_x1:] 
-        F1inv = torch.linalg.inv(F1 + 0 * torch.eye(n_x1))
+        device = F1.device  # Obtém o dispositivo de F1
+        # print("DEVICE =", device)
+        F1inv = torch.linalg.inv(F1 + 0 * torch.eye(n_x1, device=device))
 
         _, _, _, C1 = construct_A11A22B2C1(cin, cout, r, s)
 
@@ -826,9 +896,10 @@ class LipCNNFc(nn.Linear):
 
     def forward(self, x, L):
         W, L = self.LipFC2FC(L)
-        x = F.linear(x, W.float())
+        # print("layer.py 898", x.device )
+        x = F.linear(x, W.to(x.device).float())
         if self.bias is not None:
-            x += self.bias
+            x += self.bias.to(x.device)
         return x, L
  
  #------------------------------------------------------------   
