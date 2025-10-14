@@ -72,7 +72,7 @@ def lisa_loaders(config):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    transform_list = [transforms.Resize((dim, 32)), transforms.ToTensor()]
+    transform_list = [transforms.Resize((32, 32)), transforms.ToTensor()]
 
     if config.normalize:
         transform_list.append(
