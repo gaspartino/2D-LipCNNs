@@ -13,6 +13,10 @@ def getModel(config):
         'LipLeNet5': LipLeNet5,
         'Lip2C2FPool': Lip2C2FPool,
         'Lip2C2F': Lip2C2F,
+        'Lip2C1F': Lip2C1F,
+        'Lip3C1F': Lip3C1F,
+        'Lip4C1F': Lip4C1F,
+        'Lip5C1F': Lip5C1F,
         'Vanilla2C2F': Vanilla2C2F,
         'Vanilla2C2FPool': Vanilla2C2FPool,
     }[config.model]
@@ -61,16 +65,16 @@ class Lip2C2F(nn.Module):
         self.flatten = nn.Flatten()
 
     def forward(self, x):
-        # Forward pass through custom layer
+        device = x.device
+        
         n = self.img_size // 4
-
-        L = self.gamma * torch.eye(self.in_channels, dtype = torch.float64)
+        L = self.gamma * torch.eye(self.in_channels, dtype = torch.float64, device = device)
         x, L = self.LipCNNConv1(x, L)
         x = F.relu(x)
         x, L = self.LipCNNConv2(x, L)
         x = F.relu(x)
         x = self.flatten(x)
-        L = torch.kron(L,torch.eye(n*n))
+        L = torch.kron(L,torch.eye(n*n).to(L.device))
         x, L = self.LipCNNFc1(x, L)
         x = F.relu(x)
         x, _ = self.LipCNNFc2(x,L)
@@ -124,6 +128,179 @@ class Lip2C2FPool(nn.Module):
         
         return x
 
+
+
+class Lip2C1F(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+
+        self.in_channels = config.in_channels
+        self.img_size = config.img_size
+        self.num_classes = config.num_classes
+        self.gamma = config.gamma
+        self.layer = config.layer
+        g = self.gamma ** 0.5
+
+        self.LipCNNConv1 = LipCNNConv(self.in_channels, 32, 4, stride=2)
+        self.LipCNNConv2 = LipCNNConv(32, 128, 4, stride=2)
+        
+        n = self.img_size // 4
+        self.LipCNNFc1 = LipCNNFc(128 * n * n, self.num_classes, psi=None)
+
+        self.flatten = nn.Flatten()
+
+    def forward(self, x):
+        device = x.device
+        n = self.img_size // 4
+        L = self.gamma * torch.eye(self.in_channels, dtype=torch.float64, device=device)
+
+        x, L = self.LipCNNConv1(x, L)
+        x = F.relu(x)
+
+        x, L = self.LipCNNConv2(x, L)
+        x = F.relu(x)
+
+        x = self.flatten(x)
+        L = torch.kron(L, torch.eye(n * n).to(L.device))
+        x, L = self.LipCNNFc1(x, L)
+
+        return x
+
+class Lip3C1F(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+
+        self.in_channels = config.in_channels
+        self.img_size = config.img_size
+        self.num_classes = config.num_classes
+        self.gamma = config.gamma
+        self.layer = config.layer
+        g = self.gamma ** 0.5
+        
+        self.flatten = nn.Flatten()
+
+        self.LipCNNConv1 = LipCNNConv(self.in_channels, 16, 4, stride=2)
+        self.LipCNNConv2 = LipCNNConv(16, 32, 4, stride=2)
+        self.LipCNNConv3 = LipCNNConv(32, 64, 4, stride=2)
+        
+        n = self.img_size // 8
+        self.LipCNNFc1   = LipCNNFc(64 * n * n, self.num_classes, psi=None)
+
+
+    def forward(self, x):
+        device = x.device
+        n = self.img_size // 8
+        L = self.gamma * torch.eye(self.in_channels, dtype=torch.float64, device=device)
+
+        x, L = self.LipCNNConv1(x, L)
+        x = F.relu(x)
+
+        x, L = self.LipCNNConv2(x, L)
+        x = F.relu(x)
+
+        x, L = self.LipCNNConv3(x, L)
+        x = F.relu(x)
+
+        x = self.flatten(x)
+        L = torch.kron(L, torch.eye(n * n).to(L.device))
+        x, L = self.LipCNNFc1(x, L)
+
+        return x
+
+class Lip4C1F(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+
+        self.in_channels = config.in_channels
+        self.img_size = config.img_size
+        self.num_classes = config.num_classes
+        self.gamma = config.gamma
+        self.layer = config.layer
+        g = self.gamma ** 0.5
+        
+        self.flatten = nn.Flatten()
+
+        self.LipCNNConv1 = LipCNNConv(self.in_channels, 16, 4, stride=2)
+        self.LipCNNConv2 = LipCNNConv(16, 32, 4, stride=2)
+        self.LipCNNConv3 = LipCNNConv(32, 64, 4, stride=2)
+        self.LipCNNConv4 = LipCNNConv(64, 128, 4, stride=2)  # NOVA CAMADA
+
+        # atenção: agora são 4 reduções por stride=2
+        n = self.img_size // 16  
+        self.LipCNNFc1 = LipCNNFc(128 * n * n, self.num_classes, psi=None)
+
+
+    def forward(self, x):
+        device = x.device
+        n = self.img_size // 16  # também precisa mudar aqui!
+        L = self.gamma * torch.eye(self.in_channels, dtype=torch.float64, device=device)
+
+        x, L = self.LipCNNConv1(x, L)
+        x = F.relu(x)
+
+        x, L = self.LipCNNConv2(x, L)
+        x = F.relu(x)
+
+        x, L = self.LipCNNConv3(x, L)
+        x = F.relu(x)
+
+        x, L = self.LipCNNConv4(x, L)  # passa pela nova camada
+        x = F.relu(x)
+
+        x = self.flatten(x)
+        L = torch.kron(L, torch.eye(n * n).to(L.device))
+        x, L = self.LipCNNFc1(x, L)
+
+        return x
+
+class Lip5C1F(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+
+        self.in_channels = config.in_channels
+        self.img_size = config.img_size
+        self.num_classes = config.num_classes
+        self.gamma = config.gamma
+        self.layer = config.layer
+        self.n = self.img_size // 32
+        n = self.n
+        g = self.gamma ** 0.5
+        
+        self.flatten = nn.Flatten()
+
+        self.LipCNNConv1 = LipCNNConv(self.in_channels, 16, 4, stride=2)
+        self.LipCNNConv2 = LipCNNConv(16, 32, 4, stride=2)
+        self.LipCNNConv3 = LipCNNConv(32, 64, 4, stride=2)
+        self.LipCNNConv4 = LipCNNConv(64, 64, 4, stride=2)
+        self.LipCNNConv5 = LipCNNConv(64, 128, 4, stride=1)
+        
+        self.LipCNNFc1 = LipCNNFc(128 * n * n, self.num_classes, psi=None)
+
+    def forward(self, x):
+        device = x.device
+        n = self.n
+        L = self.gamma * torch.eye(self.in_channels, dtype=torch.float64, device=device)
+
+        x, L = self.LipCNNConv1(x, L)
+        x = F.relu(x)
+
+        x, L = self.LipCNNConv2(x, L)
+        x = F.relu(x)
+
+        x, L = self.LipCNNConv3(x, L)
+        x = F.relu(x)
+
+        x, L = self.LipCNNConv4(x, L)  # passa pela nova camada
+        x = F.relu(x)
+
+        x, L = self.LipCNNConv5(x, L)  # passa pela nova camada
+        x = F.relu(x)
+        
+        x = self.flatten(x)
+        L = torch.kron(L, torch.eye(n * n).to(L.device))
+        x, L = self.LipCNNFc1(x, L)
+
+        return x
 
 class AOL2C2F(nn.Module):
     def __init__(self, config):
@@ -279,7 +456,6 @@ class LipLeNet5(nn.Module):
         self.gamma = config.gamma 
         self.layer = config.layer
         g = self.gamma ** 0.5
-        
         # Define layers
         self.LipCNNConv1 = LipCNNConv(self.in_channels, 6, 5, padding = 0)
         self.Pool = nn.AvgPool2d(2)
