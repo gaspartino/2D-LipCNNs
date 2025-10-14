@@ -248,15 +248,3 @@ def train_toy(config):
             
         if epoch % config.save_freq == 0 or epoch + 1 == Epochs:
             torch.save(model.state_dict(), f"{config.train_dir}/model.ckpt")
-    
-    # after training
-    xshape = (config.lip_batch_size, config.in_channels)
-    x = (torch.rand(xshape) + 0.3*torch.randn(xshape))
-    gam = empirical_lipschitz(model, x)
-    if model.gamma is None:
-        txtlog(f"Lipschitz: {gam:.2f}/--")
-    else:
-        txtlog(f"Lipschitz capcity: {gam:.4f}/{gamma:.2f}, {100*gam/gamma:.2f}")
-
-
-
