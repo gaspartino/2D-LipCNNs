@@ -60,6 +60,7 @@ import torchattacks
 def accuracy_FGSM(model, dataset_loader, eps, device):
     attack = torchattacks.FGSM(model, eps=eps)
     total_correct = 0
+
     total_samples = 0
 
     for x, y in dataset_loader:
@@ -152,8 +153,8 @@ def PGDL2_attack(config):
     model(x)
 
     _, testLoader = getDataLoader(config)
-
     epsilons = [0.01, 0.02, 8/255, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
+    #epsilons = [0.03, 0.1]
 
     accuracies = []
 
@@ -177,10 +178,10 @@ def PGDL2_attack(config):
         accuracy = accuracy_PGD(model, testLoader, epsilon, device)
         print(f"Accuracy on PGD (ε={round(epsilon,2)}): {round(accuracy * 100, 2)}%")
         accuracies.append(accuracy)
-    print("")  
+    print("")    
 
     for epsilon in epsilons:
-        accuracy = accuracy_AA(model, testLoader, 7, epsilon, device)
+        accuracy = accuracy_AA(model, testLoader, 4, epsilon, device)
         print(f"Accuracy on AutoAttack (ε={round(epsilon,2)}): {round(accuracy * 100, 2)}%")
         accuracies.append(accuracy)
         
