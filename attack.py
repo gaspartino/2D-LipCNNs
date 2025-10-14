@@ -132,7 +132,7 @@ def PGDL2_attack(config):
     seed_everything(config.seed)
 
     model = getModel(config).to(device)
-    model_state = torch.load(f"/content/2D-LipCNNs/saved_models_seed1/Lip2C2F-Lip2C2F-gamma0.1/model.ckpt")
+    model_state = torch.load(f"{config.train_dir}/model.ckpt")
 
     try:
         model.load_state_dict(model_state)
