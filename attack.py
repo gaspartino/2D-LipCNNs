@@ -3,12 +3,17 @@ import torch.linalg as la
 import numpy as np
 import torchattacks
 from torchvision.transforms import Normalize
-from autoattack import AutoAttack
 from model import getModel
 from dataset import getDataLoader
 from utils import *
 import matplotlib.pyplot as plt
 
+def add_module_prefix(state_dict):
+    from collections import OrderedDict
+    new_state_dict = OrderedDict()
+    for k, v in state_dict.items():
+        new_state_dict[f"module.{k}"] = v
+    return new_state_dict
 
 def plot_accuracies(epsilons, accuracies):
 
@@ -23,119 +28,160 @@ def plot_accuracies(epsilons, accuracies):
 import matplotlib.pyplot as plt
 import numpy as np
 
+def accuracy_AA(model, dataset_loader, num_classes, eps, device):
+    attack = torchattacks.AutoAttack(model, norm='Linf', eps=eps, version='standard', n_classes=num_classes)
+    total_correct = 0
+    total_samples = 0
+
+    num_batches = len(dataset_loader)
+
+    for i, (x, y) in enumerate(dataset_loader):
+        x, y = x.to(device), y.to(device)
+        x_adv = attack(x, y)
+
+        with torch.no_grad():
+            predictions = model(x_adv)
+            predicted_class = predictions.argmax(dim=1)
+
+        correct = (predicted_class == y).sum().item()
+        total_correct += correct
+        total_samples += y.size(0)
+
+        # Mostrar feedback batch a batch
+        batch_acc = correct / y.size(0)
+        total_acc = total_correct / total_samples
+        print(f"[{i+1}/{num_batches}] Batch acc: {batch_acc:.4f} | Total acc até agora: {total_acc:.4f}")
+
+    return total_correct / total_samples
+
+import torch
+import torchattacks
+
+def accuracy_FGSM(model, dataset_loader, eps, device):
+    attack = torchattacks.FGSM(model, eps=eps)
+    total_correct = 0
+    total_samples = 0
+
+    for x, y in dataset_loader:
+        x, y = x.to(device), y.to(device)
+        x_adv = attack(x, y)
+
+        with torch.no_grad():
+            predictions = model(x_adv)
+            predicted_class = predictions.argmax(dim=1)
+
+        total_correct += (predicted_class == y).sum().item()
+        total_samples += y.size(0)
+
+    return total_correct / total_samples
+
+def accuracy_PGD(model, dataset_loader, eps, device):
+    attack = torchattacks.PGD(model, eps=eps)
+    total_correct = 0
+    total_samples = 0
+
+    for x, y in dataset_loader:
+        x, y = x.to(device), y.to(device)
+        x_adv = attack(x, y)
+
+        with torch.no_grad():
+            predictions = model(x_adv)
+            predicted_class = predictions.argmax(dim=1)
+
+        total_correct += (predicted_class == y).sum().item()
+        total_samples += y.size(0)
+
+    return total_correct / total_samples
+
+def accuracy_MIM(model, dataset_loader, eps, device):
+    attack = torchattacks.MIFGSM(model, eps=eps)
+    total_correct = 0
+    total_samples = 0
+
+    for x, y in dataset_loader:
+        x, y = x.to(device), y.to(device)
+        x_adv = attack(x, y)
+
+        with torch.no_grad():
+            predictions = model(x_adv)
+            predicted_class = predictions.argmax(dim=1)
+
+        total_correct += (predicted_class == y).sum().item()
+        total_samples += y.size(0)
+
+    return total_correct / total_samples
+
+def accuracy_clean(model, dataloader, device):
+    """Acurácia em dados limpos (sem ataques)."""
+    model.eval()
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for x, y in dataloader:
+            x = x.to(device)
+            y = y.to(device)
+            outputs = model(x)
+            # outputs pode ser logits; usamos argmax para predizer
+            _, preds = outputs.max(1)
+            correct += preds.eq(y).sum().item()
+            total += y.size(0)
+    return correct / total if total > 0 else 0.0
+
 def PGDL2_attack(config):
-    #seed_everything(config.seed)
-    #model = getModel(config)
-    #_, testLoader = getDataLoader(config)
-    #model_state = torch.load(f"{config.train_dir}/model.ckpt")
-    #model.load_state_dict(model_state, strict = False)
-
-    #xshape = (1, config.in_channels, config.img_size, config.img_size)
-    #x = (torch.rand(xshape) + 0.3*torch.randn(xshape)) #.cuda()
-    #model(x) # allocate memory for Q param
-
-    #model.eval()
-
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     seed_everything(config.seed)
-    model = getModel(config) #.cuda() 
+
+    model = getModel(config).to(device)
+    model_state = torch.load(f"/content/2D-LipCNNs/saved_models_seed1/Lip2C2F-Lip2C2F-gamma0.1/model.ckpt")
+
+    try:
+        model.load_state_dict(model_state)
+    except RuntimeError:
+        new_state_dict = OrderedDict()
+        for k, v in model_state.items():
+            new_state_dict[k.replace("module.", "")] = v
+        model.load_state_dict(new_state_dict)
+
+    if torch.cuda.device_count() > 1:
+        print(f"Usando {torch.cuda.device_count()} GPUs!")
+        model = nn.DataParallel(model)
+
+    model.to(device)
+
+    x = torch.rand((1, config.in_channels, config.img_size, config.img_size)).to(device)
+    model(x)
+
     _, testLoader = getDataLoader(config)
-    txtlog = TxtLogger(config)
-    xshape = (1, config.in_channels, config.img_size, config.img_size)
-    x = torch.rand(xshape) #+ 0.3*torch.randn(xshape)) #.cuda()
-    model(x) # allocate memory for Q param
-    model_state = torch.load(f"{config.train_dir}/model.ckpt")
-    model.load_state_dict(model_state)
-    model(x) # update Q param
 
-    num_classes = len(set(testLoader.dataset.targets.numpy()))  # Acessando as classes no dataset MNIST
-    print(f'Número de classes: {num_classes}')
+    epsilons = [0.01, 0.02, 8/255, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
 
-    epsilons = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
-    #epsilons = [0.0, 1.0, 2.0, 3.0, 1.58]
     accuracies = []
 
+    results = {}
+
+    clean_acc = accuracy_clean(model, testLoader, device)
+    print(f"Accuracy on clean data: {round(clean_acc * 100, 2)}%")
+    results['clean'] = clean_acc
+
     for epsilon in epsilons:
-        pgdl2 = torchattacks.PGDL2(model, eps = epsilon)
-        bim = torchattacks.BIM(model, eps=epsilon, alpha=2/255, steps=10)
-        fgsm = torchattacks.FGSM(model, eps=epsilon)
-        pgd = torchattacks.PGD(model, eps=epsilon, alpha=2/255, steps=10, random_start=True)
-
-        correct = 0
-        total = 0
-
-        for images, labels in testLoader:
-            #if epsilon == 0:
-            #    adv_images = images
-            #else:
-            adv_images = pgdl2(images, labels)
-            outputs = model(adv_images)
-            _, predicted = torch.max(outputs.data, 1)
-
-            correct += (predicted == labels).sum()
-            total += labels.size(0)
-
-        accuracy = correct / total
-
+        accuracy = accuracy_FGSM(model, testLoader, epsilon, device)
+        print(f"Accuracy on FGSM (ε={round(epsilon,2)}): {round(accuracy * 100, 2)}%")
         accuracies.append(accuracy)
-        print(f"PGDL2 | Epsilon: {epsilon}\tAccuracy: {accuracy:.4f}")
+    print("")
+    for epsilon in epsilons:
+        accuracy = accuracy_MIM(model, testLoader, epsilon, device)
+        print(f"Accuracy on MIM (ε={round(epsilon,2)}): {round(accuracy * 100, 2)}%")
+        accuracies.append(accuracy) 
+    print("")
+    for epsilon in epsilons:
+        accuracy = accuracy_PGD(model, testLoader, epsilon, device)
+        print(f"Accuracy on PGD (ε={round(epsilon,2)}): {round(accuracy * 100, 2)}%")
+        accuracies.append(accuracy)
+    print("")  
+
+    for epsilon in epsilons:
+        accuracy = accuracy_AA(model, testLoader, 7, epsilon, device)
+        print(f"Accuracy on AutoAttack (ε={round(epsilon,2)}): {round(accuracy * 100, 2)}%")
+        accuracies.append(accuracy)
         
-        correct = 0
-        total = 0
-
-        for images, labels in testLoader:
-            #if epsilon == 0:
-            #    adv_images = images
-            #else:
-            adv_images = pgd(images, labels)
-            outputs = model(adv_images)
-            _, predicted = torch.max(outputs.data, 1)
-
-            correct += (predicted == labels).sum()
-            total += labels.size(0)
-
-        accuracy = correct / total
-
-        accuracies.append(accuracy)
-        print(f"PGD | Epsilon: {epsilon}\tAccuracy: {accuracy:.4f}")
-
-        correct = 0
-        total = 0
-
-        for images, labels in testLoader:
-            #if epsilon == 0:
-            #    adv_images = images
-            #else:
-            adv_images = fgsm(images, labels)
-            outputs = model(adv_images)
-            _, predicted = torch.max(outputs.data, 1)
-
-            correct += (predicted == labels).sum()
-            total += labels.size(0)
-
-        accuracy = correct / total
-
-        accuracies.append(accuracy)
-        print(f"FGSM | Epsilon: {epsilon}\tAccuracy: {accuracy:.4f}")
-
-        correct = 0
-        total = 0
-
-        for images, labels in testLoader:
-            #if epsilon == 0:
-            #    adv_images = images
-            #else:
-            adv_images = bim(images, labels)
-            outputs = model(adv_images)
-            _, predicted = torch.max(outputs.data, 1)
-
-            correct += (predicted == labels).sum()
-            total += labels.size(0)
-
-        accuracy = correct / total
-
-        accuracies.append(accuracy)
-        print(f"BIM | Epsilon: {epsilon}\tAccuracy: {accuracy:.4f}")
-
-        print("")
-    #plot_accuracies(epsilons, accuracies)
     return accuracies
