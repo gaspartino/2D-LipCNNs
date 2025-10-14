@@ -12,7 +12,8 @@ def train(config):
     
     seed_everything(config.seed)
     trainLoader, testLoader = getDataLoader(config)
-    model = getModel(config)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = getModel(config).to(device)
     criterion = getLoss(config)
 
     txtlog = TxtLogger(config)
