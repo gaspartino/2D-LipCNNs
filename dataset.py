@@ -118,7 +118,7 @@ def bstl_loaders(config):
     train_dir = "/kaggle/input/bstl-dataset/train"
     test_dir = "/kaggle/input/bstl-dataset/test"
 
-    transform_list = [transforms.Resize((dim, 32)), transforms.ToTensor()]
+    transform_list = [transforms.Resize((32, dim)), transforms.ToTensor()]
 
     if config.normalize:
         transform_list.append(
