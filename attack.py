@@ -1,3 +1,5 @@
+%%writefile attack.py
+
 import torch
 import torch.linalg as la
 import numpy as np
@@ -56,84 +58,109 @@ def accuracy_AA(model, dataset_loader, num_classes, eps, device):
 
 import torch
 import torchattacks
+from sklearn.metrics import precision_score, recall_score, f1_score
 
-def accuracy_FGSM(model, dataset_loader, eps, device):
-    attack = torchattacks.FGSM(model, eps=eps)
-    total_correct = 0
-
-    total_samples = 0
-
-    for x, y in dataset_loader:
-        x, y = x.to(device), y.to(device)
-        x_adv = attack(x, y)
-
-        with torch.no_grad():
-            predictions = model(x_adv)
-            predicted_class = predictions.argmax(dim=1)
-
-        total_correct += (predicted_class == y).sum().item()
-        total_samples += y.size(0)
-
-    return total_correct / total_samples
-
-def accuracy_PGD(model, dataset_loader, eps, device):
-    attack = torchattacks.PGD(model, eps=eps)
-    total_correct = 0
-    total_samples = 0
-
-    for x, y in dataset_loader:
-        x, y = x.to(device), y.to(device)
-        x_adv = attack(x, y)
-
-        with torch.no_grad():
-            predictions = model(x_adv)
-            predicted_class = predictions.argmax(dim=1)
-
-        total_correct += (predicted_class == y).sum().item()
-        total_samples += y.size(0)
-
-    return total_correct / total_samples
-
-def accuracy_MIM(model, dataset_loader, eps, device):
-    attack = torchattacks.MIFGSM(model, eps=eps)
-    total_correct = 0
-    total_samples = 0
-
-    for x, y in dataset_loader:
-        x, y = x.to(device), y.to(device)
-        x_adv = attack(x, y)
-
-        with torch.no_grad():
-            predictions = model(x_adv)
-            predicted_class = predictions.argmax(dim=1)
-
-        total_correct += (predicted_class == y).sum().item()
-        total_samples += y.size(0)
-
-    return total_correct / total_samples
-
-def accuracy_clean(model, dataloader, device):
-    """Acurácia em dados limpos (sem ataques)."""
+def evaluate_model(model, dataset_loader, attack=None, attack_name="Clean", device=None):
     model.eval()
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for x, y in dataloader:
-            x = x.to(device)
-            y = y.to(device)
+    if device is None:
+        device = next(model.parameters()).device
+
+    y_true_all, y_pred_all = [], []
+
+    for i, (x, y) in enumerate(dataset_loader):
+        x, y = x.to(device), y.to(device)
+
+        if attack is not None:
+            x = attack(x, y)
+
+        with torch.no_grad():
             outputs = model(x)
-            # outputs pode ser logits; usamos argmax para predizer
-            _, preds = outputs.max(1)
-            correct += preds.eq(y).sum().item()
-            total += y.size(0)
-    return correct / total if total > 0 else 0.0
+            predicted_class = outputs.argmax(dim=1)
+
+        y_true_all.extend(y.cpu().numpy())
+        y_pred_all.extend(predicted_class.cpu().numpy())
+
+    acc = (torch.tensor(y_true_all) == torch.tensor(y_pred_all)).float().mean().item()
+    precision = precision_score(y_true_all, y_pred_all, average='macro', zero_division=0)
+    recall = recall_score(y_true_all, y_pred_all, average='macro', zero_division=0)
+    f1 = f1_score(y_true_all, y_pred_all, average='macro', zero_division=0)
+
+    print(f"\n=== {attack_name} RESULTS ===")
+    print(f"Accuracy:  {acc * 100:.2f}%")
+    print(f"Precision: {precision * 100:.2f}%")
+    print(f"Recall:    {recall * 100:.2f}%")
+    print(f"F1-score:  {f1 * 100:.2f}%\n")
+
+    return acc, precision, recall, f1
+
+def accuracy_clean(model, dataset_loader, device):
+    return evaluate_model(model, dataset_loader, None, "Clean", device)
+
+
+def accuracy_FGSM(model, dataset_loader, eps, device, normalize):
+    attack = torchattacks.FGSM(model, eps=eps)
+    mean = [0.485, 0.456, 0.406]
+    std  = [0.229, 0.224, 0.225]
+    if normalize:
+        attack.set_normalization_used(mean=mean, std=std)
+
+    return evaluate_model(model, dataset_loader, attack, f"FGSM (ε={eps})", device)
+
+
+def accuracy_PGD(model, dataset_loader, eps, device, normalize):
+    attack = torchattacks.PGD(model, eps=eps)   
+    mean = [0.485, 0.456, 0.406]
+    std  = [0.229, 0.224, 0.225]
+    if normalize:
+        attack.set_normalization_used(mean=mean, std=std)
+
+    return evaluate_model(model, dataset_loader, attack, f"PGD (ε={eps})", device)
+
+
+def accuracy_MIM(model, dataset_loader, eps, device, normalize):
+    attack = torchattacks.MIFGSM(model, eps=eps) 
+    mean = [0.485, 0.456, 0.406]
+    std  = [0.229, 0.224, 0.225]
+    if normalize:
+        attack.set_normalization_used(mean=mean, std=std)
+
+    return evaluate_model(model, dataset_loader, attack, f"MIM (ε={eps})", device)
+
+
+def accuracy_CW(model, dataset_loader, device, normalize, c=1e-4, kappa=0):
+    attack = torchattacks.CW(model, c=c, kappa=kappa)   
+    mean = [0.485, 0.456, 0.406]
+    std  = [0.229, 0.224, 0.225]
+    if normalize:
+        attack.set_normalization_used(mean=mean, std=std)
+
+    return evaluate_model(model, dataset_loader, attack, f"CW (c={c})", device)
+
+def accuracy_Square(model, dataset_loader, eps, device, normalize):
+    attack = torchattacks.Square(model, eps=eps, n_queries=100)   
+    mean = [0.485, 0.456, 0.406]
+    std  = [0.229, 0.224, 0.225]
+    if normalize:
+        attack.set_normalization_used(mean=mean, std=std)
+
+    return evaluate_model(model, dataset_loader, attack, f"Square (ε={eps})", device)
+    
+def accuracy_AutoAttack(model, dataset_loader, num_classes, eps, device, normalize):
+    attack = torchattacks.AutoAttack(model, eps=eps, n_classes=num_classes)
+    mean = [0.485, 0.456, 0.406]
+    std  = [0.229, 0.224, 0.225]
+    if normalize:
+        attack.set_normalization_used(mean=mean, std=std)
+
+    return evaluate_model(model, dataset_loader, attack, f"AutoAttack (ε={eps})", device)
+
 
 def PGDL2_attack(config):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     seed_everything(config.seed)
 
     model = getModel(config).to(device)
-    model_state = torch.load(f"{config.train_dir}/model.ckpt")
+    model_state = torch.load(f"/kaggle/input/lip-models/pytorch/default/2/lip_bstl_nat.ckpt")
 
     try:
         model.load_state_dict(model_state)
@@ -153,36 +180,24 @@ def PGDL2_attack(config):
     model(x)
 
     _, testLoader = getDataLoader(config)
-    epsilons = [0.01, 0.02, 8/255, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
-    #epsilons = [0.03, 0.1]
 
-    accuracies = []
+    accuracy = []
+    
+    acc, prec, rec, f1 = accuracy_clean(model, testLoader, device)
+    accuracy.append(acc)
+    all_eps = [0.01, 8/255, 0.04, 0.055, 0.07, 0.085, 0.1, 0.115, 0.13, 0.15, 0.175, 0.2]
+    #all_eps = [0.13, 0.15, 0.175, 0.2]
 
-    results = {}
-
-    clean_acc = accuracy_clean(model, testLoader, device)
-    print(f"Accuracy on clean data: {round(clean_acc * 100, 2)}%")
-    results['clean'] = clean_acc
-
-    for epsilon in epsilons:
-        accuracy = accuracy_FGSM(model, testLoader, epsilon, device)
-        print(f"Accuracy on FGSM (ε={round(epsilon,2)}): {round(accuracy * 100, 2)}%")
-        accuracies.append(accuracy)
-    print("")
-    for epsilon in epsilons:
-        accuracy = accuracy_MIM(model, testLoader, epsilon, device)
-        print(f"Accuracy on MIM (ε={round(epsilon,2)}): {round(accuracy * 100, 2)}%")
-        accuracies.append(accuracy) 
-    print("")
-    for epsilon in epsilons:
-        accuracy = accuracy_PGD(model, testLoader, epsilon, device)
-        print(f"Accuracy on PGD (ε={round(epsilon,2)}): {round(accuracy * 100, 2)}%")
-        accuracies.append(accuracy)
-    print("")    
-
-    for epsilon in epsilons:
-        accuracy = accuracy_AA(model, testLoader, 4, epsilon, device)
-        print(f"Accuracy on AutoAttack (ε={round(epsilon,2)}): {round(accuracy * 100, 2)}%")
-        accuracies.append(accuracy)
-        
-    return accuracies
+    for eps in all_eps:
+        accuracy_FGSM(model, testLoader, eps, device, config.normalize)
+    
+    for eps in all_eps:
+        accuracy_PGD(model, testLoader, eps, device, config.normalize)
+    
+    for eps in all_eps:
+        accuracy_MIM(model, testLoader, eps, device, config.normalize)
+    
+    for eps in all_eps:
+        accuracy_AutoAttack(model, testLoader, 4, eps, device, config.normalize)
+    
+    return True
