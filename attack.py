@@ -1,14 +1,15 @@
 %%writefile attack.py
 
 import torch
-import torch.linalg as la
 import numpy as np
 import torchattacks
-from torchvision.transforms import Normalize
+import torch.linalg as la
+import matplotlib.pyplot as plt
+from utils import *
 from model import getModel
 from dataset import getDataLoader
-from utils import *
-import matplotlib.pyplot as plt
+from torchvision.transforms import Normalize
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 def add_module_prefix(state_dict):
     from collections import OrderedDict
@@ -26,39 +27,6 @@ def plot_accuracies(epsilons, accuracies):
     plt.ylabel("Accuracy")
     plt.grid()
     plt.show()
-
-import matplotlib.pyplot as plt
-import numpy as np
-
-def accuracy_AA(model, dataset_loader, num_classes, eps, device):
-    attack = torchattacks.AutoAttack(model, norm='Linf', eps=eps, version='standard', n_classes=num_classes)
-    total_correct = 0
-    total_samples = 0
-
-    num_batches = len(dataset_loader)
-
-    for i, (x, y) in enumerate(dataset_loader):
-        x, y = x.to(device), y.to(device)
-        x_adv = attack(x, y)
-
-        with torch.no_grad():
-            predictions = model(x_adv)
-            predicted_class = predictions.argmax(dim=1)
-
-        correct = (predicted_class == y).sum().item()
-        total_correct += correct
-        total_samples += y.size(0)
-
-        # Mostrar feedback batch a batch
-        batch_acc = correct / y.size(0)
-        total_acc = total_correct / total_samples
-        print(f"[{i+1}/{num_batches}] Batch acc: {batch_acc:.4f} | Total acc até agora: {total_acc:.4f}")
-
-    return total_correct / total_samples
-
-import torch
-import torchattacks
-from sklearn.metrics import precision_score, recall_score, f1_score
 
 def evaluate_model(model, dataset_loader, attack=None, attack_name="Clean", device=None):
     model.eval()
@@ -96,7 +64,6 @@ def evaluate_model(model, dataset_loader, attack=None, attack_name="Clean", devi
 def accuracy_clean(model, dataset_loader, device):
     return evaluate_model(model, dataset_loader, None, "Clean", device)
 
-
 def accuracy_FGSM(model, dataset_loader, eps, device, normalize):
     attack = torchattacks.FGSM(model, eps=eps)
     mean = [0.485, 0.456, 0.406]
@@ -105,7 +72,6 @@ def accuracy_FGSM(model, dataset_loader, eps, device, normalize):
         attack.set_normalization_used(mean=mean, std=std)
 
     return evaluate_model(model, dataset_loader, attack, f"FGSM (ε={eps})", device)
-
 
 def accuracy_PGD(model, dataset_loader, eps, device, normalize):
     attack = torchattacks.PGD(model, eps=eps)   
@@ -116,7 +82,6 @@ def accuracy_PGD(model, dataset_loader, eps, device, normalize):
 
     return evaluate_model(model, dataset_loader, attack, f"PGD (ε={eps})", device)
 
-
 def accuracy_MIM(model, dataset_loader, eps, device, normalize):
     attack = torchattacks.MIFGSM(model, eps=eps) 
     mean = [0.485, 0.456, 0.406]
@@ -125,25 +90,6 @@ def accuracy_MIM(model, dataset_loader, eps, device, normalize):
         attack.set_normalization_used(mean=mean, std=std)
 
     return evaluate_model(model, dataset_loader, attack, f"MIM (ε={eps})", device)
-
-
-def accuracy_CW(model, dataset_loader, device, normalize, c=1e-4, kappa=0):
-    attack = torchattacks.CW(model, c=c, kappa=kappa)   
-    mean = [0.485, 0.456, 0.406]
-    std  = [0.229, 0.224, 0.225]
-    if normalize:
-        attack.set_normalization_used(mean=mean, std=std)
-
-    return evaluate_model(model, dataset_loader, attack, f"CW (c={c})", device)
-
-def accuracy_Square(model, dataset_loader, eps, device, normalize):
-    attack = torchattacks.Square(model, eps=eps, n_queries=100)   
-    mean = [0.485, 0.456, 0.406]
-    std  = [0.229, 0.224, 0.225]
-    if normalize:
-        attack.set_normalization_used(mean=mean, std=std)
-
-    return evaluate_model(model, dataset_loader, attack, f"Square (ε={eps})", device)
     
 def accuracy_AutoAttack(model, dataset_loader, num_classes, eps, device, normalize):
     attack = torchattacks.AutoAttack(model, eps=eps, n_classes=num_classes)
@@ -154,14 +100,13 @@ def accuracy_AutoAttack(model, dataset_loader, num_classes, eps, device, normali
 
     return evaluate_model(model, dataset_loader, attack, f"AutoAttack (ε={eps})", device)
 
-
 def PGDL2_attack(config):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     seed_everything(config.seed)
 
     model = getModel(config).to(device)
-    model_state = torch.load(f"/kaggle/input/lip-models/pytorch/default/2/lip_bstl_nat.ckpt")
-
+    model_state = torch.load(f"{config.train_dir}/model.ckpt")
+    
     try:
         model.load_state_dict(model_state)
     except RuntimeError:
