@@ -9,17 +9,17 @@ def main(args):
 
     config = args 
 
-    config.lip_batch_size = 64
+    config.lip_batch_size = 512
     config.print_freq = 10
     config.save_freq = 5
-    config.dataset == 'lisa'
+    config.dataset == 'bstl'
     config.in_channels = 3
     config.img_size = 32
-    config.num_classes = 7
+    config.num_classes = 4
     config.loss = 'xent'
     config.offset = 1.5
 
-    if config.model in ['Lip2C2F', 'Lip2C1F', 'Lip3C1F', 'Lip4C1F', 'Lip5C1F']:
+    if config.model in ['Lip2C2F', 'Lip2C1F', 'Lip3C1F']:
         config.layer = 'Lip2C2F'
     elif config.model == 'Lip2C2FPool':
         config.layer = 'LipC2FPool'
@@ -67,12 +67,12 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.01,
                         help="learning rate")
     parser.add_argument('--root_dir', type=str, default='./saved_models')
-    parser.add_argument('--train_batch_size', type=int, default=128)
-    parser.add_argument('--test_batch_size', type=int, default=128)
-    parser.add_argument('-d', '--dataset', type=str, default='lisa')
+    parser.add_argument('--train_batch_size', type=int, default=1024)
+    parser.add_argument('--test_batch_size', type=int, default=512)
+    parser.add_argument('-d', '--dataset', type=str, default='bstl')
     parser.add_argument('--cert_acc', action='store_true', default=True)
     parser.add_argument('--normalize', action='store_true', default=False)
-
+    
     args = parser.parse_args()
 
     seeds = [1]
@@ -80,15 +80,14 @@ if __name__ == '__main__':
     models = ['Lip2C2F']
     layers = ['Lip2C2F']
 
-    gammas = [1]
+    gammas = [1.0]
 
     for seed in seeds:
         args.seed = seed
         for model in models:
             args.model = model
             print(f"Running with seed: {seed}, model: {model}")
-            print(f"Dados normalizados? {args.normalize}")
-
+       
             if model in ['All2C2F', 'Lip2C2F','AOL2C2F','Lip2C2FPool']:
                 for gamma in gammas:
                     args.gamma = gamma
