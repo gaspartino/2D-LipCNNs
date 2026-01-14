@@ -44,8 +44,6 @@ def lisa_loaders(config):
     train_dir = f"{path}/cropped_lisa_1/train_1"
     val_dir = f"{path}/cropped_lisa_1/val_1"
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     transform_list = [transforms.Resize((32, 32)), transforms.ToTensor()]
 
     if config.normalize:
