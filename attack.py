@@ -1,5 +1,3 @@
-%%writefile attack.py
-
 import torch
 import numpy as np
 import torchattacks
