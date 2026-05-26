@@ -17,7 +17,6 @@ def train(config):
     model = getModel(config).to(device)
     criterion = getLoss(config)
 
-    #cure = CURE_Regularizer(model, device, lambda_=4.0)
     txtlog = TxtLogger(config)
     txtlog(vars(config))
 
