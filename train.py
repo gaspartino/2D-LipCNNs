@@ -9,41 +9,6 @@ from attack import *
 from compute_lip_2 import *
 from torch.autograd import grad
 
-class CURE_Regularizer:
-    def __init__(self, model, device, lambda_=4.0):
-        self.model = model
-        self.device = device
-        self.lambda_ = lambda_
-        self.criterion = nn.CrossEntropyLoss()
-
-    def _find_z(self, inputs, targets, h=3.0):
-        inputs.requires_grad_(True)
-        outputs = self.model(inputs)
-        loss = self.criterion(outputs, targets)
-        grad_inputs = grad(loss, inputs, create_graph=True)[0]
-
-        z = torch.sign(grad_inputs.detach())
-        z_norm = z.view(z.size(0), -1).norm(dim=1, keepdim=True)[..., None, None]
-        z = h * z / (z_norm + 1e-7)
-
-        inputs.requires_grad_(False)
-        return z, grad_inputs.norm().item()
-
-    def compute(self, inputs, targets, h=3.0):
-        z, norm_grad = self._find_z(inputs, targets, h)
-
-        inputs.requires_grad_(True)
-        outputs_pos = self.model(inputs + z)
-        outputs_orig = self.model(inputs)
-
-        loss_pos = self.criterion(outputs_pos, targets)
-        loss_orig = self.criterion(outputs_orig, targets)
-
-        grad_diff = grad(loss_pos - loss_orig, inputs, create_graph=True)[0]
-        reg = grad_diff.view(grad_diff.size(0), -1).norm(dim=1)
-
-        return (self.lambda_ * reg.mean(), norm_grad)
-
 def train(config):
     
     seed_everything(config.seed)
@@ -92,11 +57,7 @@ def train(config):
             opt.param_groups[0].update(lr=lr)
 
             yh = model(x)
-            # print(x.device, device)
             J = criterion(yh, y)
-
-            #reg, grad_norm = cure.compute(x, y, h=6)
-            #J = J + reg
             opt.zero_grad()
             J.backward()
             opt.step()
