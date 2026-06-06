@@ -48,9 +48,9 @@ def main(args):
         config.gamma = None
 
     if config.gamma is None:
-        config.train_dir = f"{config.root_dir}_seed{config.seed}/{config.model}-{config.layer}"
+        config.train_dir = f"{config.root_dir}/{config.model}-{config.layer}"
     else:
-        config.train_dir = f"{config.root_dir}_seed{config.seed}/{config.model}-{config.layer}-gamma{config.gamma:.1f}"
+        config.train_dir = f"{config.root_dir}/{config.model}-{config.layer}-gamma{config.gamma:.1f}"
 
     os.makedirs("./data", exist_ok=True)
     os.makedirs(config.train_dir, exist_ok=True)
