@@ -1,5 +1,6 @@
 import os
 import warnings
+import random
 from argparse import ArgumentParser
 from train import *
 from attack import *
@@ -8,14 +9,18 @@ warnings.filterwarnings("ignore")
 def main(args):
 
     config = args 
-
+    output_size = 10
+    if config.dataset == 'bstl':
+        output_size = 4
+    elif config.dataset == 'lisa':
+        output_size = 7
+    
     config.lip_batch_size = 512
     config.print_freq = 10
     config.save_freq = 5
-    config.dataset == 'bstl'
     config.in_channels = 3
     config.img_size = 32
-    config.num_classes = 4
+    config.num_classes = output_size
     config.loss = 'xent'
     config.offset = 1.5
 
@@ -57,25 +62,23 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--mode', type=str, default='train')
-    parser.add_argument('-m', '--model', type=str, default='Lip2C2F',
-                        help="[Lip2C2F, All2C2F, Vanilla2C2F, LipLeNet5, LipLeNet5Max, AllLeNet5, Vanilla2C2F]")
-    parser.add_argument('-g', '--gamma', type=float, default=1.0,
-                        help="Network Lipschitz bound") # 1.0
-    parser.add_argument('-s', '--seed', type=int, default=1) # 123
-    parser.add_argument('-e','--epochs', type=int, default=20) # 100
+    parser.add_argument('-m', '--model', type=str, default='Lip2C2F', help="[Lip2C2F, All2C2F, Vanilla2C2F, LipLeNet5, LipLeNet5Max, AllLeNet5, Vanilla2C2F]")
+    parser.add_argument('-g', '--gamma', type=float, default=1.0, help="Network Lipschitz bound")
+    parser.add_argument('-s', '--seed', type=int, default=1)
+    parser.add_argument('-e','--epochs', type=int, default=20)
     parser.add_argument('--layer', type=str, default='Aol')
-    parser.add_argument('--lr', type=float, default=0.01,
-                        help="learning rate")
+    parser.add_argument('--lr', type=float, default=0.01, help="learning rate")
     parser.add_argument('--root_dir', type=str, default='./saved_models')
     parser.add_argument('--train_batch_size', type=int, default=1024)
     parser.add_argument('--test_batch_size', type=int, default=512)
     parser.add_argument('-d', '--dataset', type=str, default='bstl')
+    parser.add_argument('-tl','--total_loops', type=int, default=1)
     parser.add_argument('--cert_acc', action='store_true', default=True)
     parser.add_argument('--normalize', action='store_true', default=False)
     
     args = parser.parse_args()
-
-    seeds = [1]
+    
+    seeds = [random.randint(0, 100)]
 
     models = ['Lip2C2F']
     layers = ['Lip2C2F']
