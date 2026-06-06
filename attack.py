@@ -102,45 +102,49 @@ def PGDL2_attack(config):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     seed_everything(config.seed)
 
-    model = getModel(config).to(device)
-    model_state = torch.load(f"{config.train_dir}/model.ckpt")
+    for loop_idx in range(config.total_loops):
+        if config.total_loops > 1:
+            print(f"\n========== Loop {loop_idx + 1}/{config.total_loops} ==========\n")
     
-    try:
-        model.load_state_dict(model_state)
-    except RuntimeError:
-        new_state_dict = OrderedDict()
-        for k, v in model_state.items():
-            new_state_dict[k.replace("module.", "")] = v
-        model.load_state_dict(new_state_dict)
-
-    if torch.cuda.device_count() > 1:
-        print(f"Usando {torch.cuda.device_count()} GPUs!")
-        model = nn.DataParallel(model)
-
-    model.to(device)
-
-    x = torch.rand((1, config.in_channels, config.img_size, config.img_size)).to(device)
-    model(x)
-
-    _, testLoader = getDataLoader(config)
-
-    accuracy = []
+        model = getModel(config).to(device)
+        model_state = torch.load(f"{config.train_dir}/{config.model}_model{loop_idx}.ckpt")
+        
+        try:
+            model.load_state_dict(model_state)
+        except RuntimeError:
+            new_state_dict = OrderedDict()
+            for k, v in model_state.items():
+                new_state_dict[k.replace("module.", "")] = v
+            model.load_state_dict(new_state_dict)
     
-    acc, prec, rec, f1 = accuracy_clean(model, testLoader, device)
-    accuracy.append(acc)
-    all_eps = [0.01, 8/255, 0.04, 0.055, 0.07, 0.085, 0.1, 0.115, 0.13, 0.15, 0.175, 0.2]
-    #all_eps = [0.13, 0.15, 0.175, 0.2]
-
-    for eps in all_eps:
-        accuracy_FGSM(model, testLoader, eps, device, config.normalize)
+        if torch.cuda.device_count() > 1:
+            print(f"Usando {torch.cuda.device_count()} GPUs!")
+            model = nn.DataParallel(model)
     
-    for eps in all_eps:
-        accuracy_PGD(model, testLoader, eps, device, config.normalize)
+        model.to(device)
     
-    for eps in all_eps:
-        accuracy_MIM(model, testLoader, eps, device, config.normalize)
+        x = torch.rand((1, config.in_channels, config.img_size, config.img_size)).to(device)
+        model(x)
     
-    for eps in all_eps:
-        accuracy_AutoAttack(model, testLoader, 4, eps, device, config.normalize)
+        _, testLoader = getDataLoader(config)
     
+        accuracy = []
+        
+        acc, prec, rec, f1 = accuracy_clean(model, testLoader, device)
+        accuracy.append(acc)
+        all_eps = [0.01, 8/255, 0.04, 0.055, 0.07, 0.085, 0.1, 0.115, 0.13, 0.15, 0.175, 0.2]
+    
+        for eps in all_eps:
+            accuracy_FGSM(model, testLoader, eps, device, config.normalize)
+        
+        for eps in all_eps:
+            accuracy_PGD(model, testLoader, eps, device, config.normalize)
+        
+        for eps in all_eps:
+            accuracy_MIM(model, testLoader, eps, device, config.normalize)
+            
+        if config.ignore_autoattack:        
+            for eps in all_eps:
+                accuracy_AutoAttack(model, testLoader, 4, eps, device, config.normalize)
+        
     return True
