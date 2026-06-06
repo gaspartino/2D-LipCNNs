@@ -75,7 +75,8 @@ if __name__ == '__main__':
     parser.add_argument('-tl','--total_loops', type=int, default=1)
     parser.add_argument('--cert_acc', action='store_true', default=True)
     parser.add_argument('--normalize', action='store_true', default=False)
-    
+    parser.add_argument('--ignore_autoattack', action='store_true', default=False)
+
     args = parser.parse_args()
     
     seeds = [random.randint(0, 100)]
