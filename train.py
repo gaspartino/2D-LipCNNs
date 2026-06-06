@@ -15,9 +15,9 @@ def train(config):
     trainLoader, testLoader = getDataLoader(config)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    for loop_idx in range(args.total_loops):
-        if args.total_loops > 1:
-            print(f"\n========== Loop {loop_idx + 1}/{args.total_loops} ==========\n")
+    for loop_idx in range(config.total_loops):
+        if config.total_loops > 1:
+            print(f"\n========== Loop {loop_idx + 1}/{config.total_loops} ==========\n")
       
         model = getModel(config).to(device)
         criterion = getLoss(config)
