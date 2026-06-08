@@ -40,7 +40,7 @@ def cifar10_loaders(config):
     return trainLoader, testLoader
 
 def lisa_loaders(config):
-    path = '/kaggle/input/cropped-lisa-traffic-light-dataset'
+    path = kagglehub.dataset_download("chandanakuntala/cropped-lisa-traffic-light-dataset")
     train_dir = f"{path}/cropped_lisa_1/train_1"
     val_dir = f"{path}/cropped_lisa_1/val_1"
 
@@ -68,8 +68,9 @@ def lisa_loaders(config):
     return train_loader, test_loader
 
 def bstl_loaders(config):
-    train_dir = "/kaggle/input/bstl-dataset/train"
-    test_dir = "/kaggle/input/bstl-dataset/test"
+    path = kagglehub.dataset_download("andrevinic/bstl-dataset")
+    train_dir = f"{path}/train"
+    test_dir = f"{path}/test"
 
     transform_list = [transforms.Resize((32, 32)), transforms.ToTensor()]
 
