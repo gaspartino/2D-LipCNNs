@@ -143,7 +143,7 @@ def PGDL2_attack(config):
         for eps in all_eps:
             accuracy_MIM(model, testLoader, eps, device, config.normalize)
             
-        if config.ignore_autoattack:        
+        if not config.ignore_autoattack:        
             for eps in all_eps:
                 accuracy_AutoAttack(model, testLoader, 4, eps, device, config.normalize)
         
