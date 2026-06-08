@@ -11,7 +11,7 @@ from torch.autograd import grad
 
 def train(config):
     
-    seed_everything(config.seed)
+    #seed_everything(config.seed)
     trainLoader, testLoader = getDataLoader(config)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
