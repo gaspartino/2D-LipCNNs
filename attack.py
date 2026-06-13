@@ -96,7 +96,7 @@ def accuracy_AutoAttack(model, dataset_loader, num_classes, eps, device, normali
 
 def PGDL2_attack(config):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    seed_everything(config.seed)
+    #seed_everything(config.seed)
 
     for loop_idx in range(config.total_loops):
         if config.total_loops > 1:
