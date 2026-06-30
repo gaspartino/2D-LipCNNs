@@ -126,29 +126,32 @@ def PGDL2_attack(config):
     
         accuracy = []
         
-        acc, prec, rec, f1 = accuracy_clean(model, testLoader, device)
+        acc, prec, rec, f1, y_true, y_pred = accuracy_clean(model, testLoader, device)
+        cm = confusion_matrix(y_true, y_pred)
+        print(cm)
+
         accuracy.append(acc)
         all_eps = [0.01, 8/255, 0.04, 0.055, 0.07, 0.085, 0.1, 0.115, 0.13, 0.15, 0.175, 0.2]
     
         for eps in all_eps:
-            accuracy_FGSM(model, testLoader, eps, device, config.normalize)
-            cm = confusion_matrix(y_true_all, y_pred_all)
+            acc, prec, rec, f1, y_true, y_pred = accuracy_FGSM(model, testLoader, eps, device, config.normalize)
+            cm = confusion_matrix(y_true, y_pred)
             print(cm)
             
         for eps in all_eps:
-            accuracy_PGD(model, testLoader, eps, device, config.normalize)
-            cm = confusion_matrix(y_true_all, y_pred_all)
+            acc, prec, rec, f1, y_true, y_pred = accuracy_PGD(model, testLoader, eps, device, config.normalize)
+            cm = confusion_matrix(y_true, y_pred)
             print(cm)
             
         for eps in all_eps:
-            accuracy_MIM(model, testLoader, eps, device, config.normalize)
-            cm = confusion_matrix(y_true_all, y_pred_all)
+            acc, prec, rec, f1, y_true, y_pred = accuracy_MIM(model, testLoader, eps, device, config.normalize)
+            cm = confusion_matrix(y_true, y_pred)
             print(cm)
             
         if not config.ignore_autoattack:        
             for eps in all_eps:
-                accuracy_AutoAttack(model, testLoader, 4, eps, device, config.normalize)
-                cm = confusion_matrix(y_true_all, y_pred_all)
+                acc, prec, rec, f1, y_true, y_pred = accuracy_AutoAttack(model, testLoader, 4, eps, device, config.normalize)
+                cm = confusion_matrix(y_true, y_pred)
                 print(cm)
             
     return True
