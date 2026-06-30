@@ -79,29 +79,4 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     
-    seeds = [random.randint(0, 100)]
-
-    models = ['Lip2C2F']
-    layers = ['Lip2C2F']
-
-    gammas = [1.0]
-
-    for seed in seeds:
-        args.seed = seed
-        for model in models:
-            args.model = model
-            print(f"Running with seed: {seed}, model: {model}")
-       
-            if model in ['All2C2F', 'Lip2C2F','AOL2C2F','Lip2C2FPool']:
-                for gamma in gammas:
-                    args.gamma = gamma
-                    print(f"Running with gamma: {gamma}")
-                    if model == 'All2C2F':
-                        for layer in layers:
-                            args.layer = layer
-                            print(f"Running with layer: {layer}")
-                            main(args)
-                    else:
-                        main(args)
-            else:
-                main(args)
+    main(args)
