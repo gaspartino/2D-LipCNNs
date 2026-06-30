@@ -7,7 +7,7 @@ from utils import *
 from model import getModel
 from dataset import getDataLoader
 from torchvision.transforms import Normalize
-from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
 
 def add_module_prefix(state_dict):
     from collections import OrderedDict
@@ -53,7 +53,7 @@ def evaluate_model(model, dataset_loader, attack=None, attack_name="Clean", devi
 
     print(f"{attack_name} | Accuracy: {acc * 100:.2f}%, Precision: {precision:.4f}%, Recall: {recall:.4f}%, F1-score: {f1:.4f}%")
 
-    return acc, precision, recall, f1
+    return acc, precision, recall, f1, y_true_all, y_pred_all
 
 def accuracy_clean(model, dataset_loader, device):
     return evaluate_model(model, dataset_loader, None, "Clean", device)
@@ -82,7 +82,7 @@ def accuracy_MIM(model, dataset_loader, eps, device, normalize):
     std  = [0.229, 0.224, 0.225]
     if normalize:
         attack.set_normalization_used(mean=mean, std=std)
-
+    
     return evaluate_model(model, dataset_loader, attack, f"MIM (ε={eps:.2f})", device)
     
 def accuracy_AutoAttack(model, dataset_loader, num_classes, eps, device, normalize):
@@ -132,15 +132,23 @@ def PGDL2_attack(config):
     
         for eps in all_eps:
             accuracy_FGSM(model, testLoader, eps, device, config.normalize)
-        
+            cm = confusion_matrix(y_true_all, y_pred_all)
+            print(cm)
+            
         for eps in all_eps:
             accuracy_PGD(model, testLoader, eps, device, config.normalize)
-        
+            cm = confusion_matrix(y_true_all, y_pred_all)
+            print(cm)
+            
         for eps in all_eps:
             accuracy_MIM(model, testLoader, eps, device, config.normalize)
+            cm = confusion_matrix(y_true_all, y_pred_all)
+            print(cm)
             
         if not config.ignore_autoattack:        
             for eps in all_eps:
                 accuracy_AutoAttack(model, testLoader, 4, eps, device, config.normalize)
-        
+                cm = confusion_matrix(y_true_all, y_pred_all)
+                print(cm)
+            
     return True
